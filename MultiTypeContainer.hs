@@ -42,7 +42,7 @@ testPairCmapA = cmapA (map Just) pair
 testPairCmapM :: [Pair Int Bool Maybe]
 testPairCmapM = cmapM (map Just) pair
 
--- containg container
+-- containing container
 
 data ListC a b c t =
   ListC
