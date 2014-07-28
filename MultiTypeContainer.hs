@@ -66,8 +66,10 @@ testListCCmapA :: [ListC Int Bool Ordering Maybe]
 testListCCmapA = cmapA (map Just) listc
 
 {-|
+length $ testListCCmapM == 3 * 2 * 2 * 2
 >>> length $ testListCCmapM
 24
+
 >>> head $ testListCCmapM
 ListC {unListCA = [Just 1,Just 4], unListCB = [Just True], unListCC = [Just LT]}
 >>> last $ testListCCmapM
