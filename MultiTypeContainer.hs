@@ -36,6 +36,8 @@ testPairCmapA :: [Pair Int Bool Maybe]
 testPairCmapA = cmapA (map Just) pair
 
 {-|
+>>> length testPairCmapM == 3 * 2
+True
 >>> testPairCmapM
 [Pair {unPair = (Just 1,Just True)},Pair {unPair = (Just 1,Just False)},Pair {unPair = (Just 2,Just True)},Pair {unPair = (Just 2,Just False)},Pair {unPair = (Just 3,Just True)},Pair {unPair = (Just 3,Just False)}]
 -}
@@ -66,13 +68,11 @@ testListCCmapA :: [ListC Int Bool Ordering Maybe]
 testListCCmapA = cmapA (map Just) listc
 
 {-|
-length $ testListCCmapM == 3 * 2 * 2 * 2
->>> length $ testListCCmapM
-24
-
->>> head $ testListCCmapM
+>>> length testListCCmapM == 3 * 2 * 2 * 2
+True
+>>> head testListCCmapM
 ListC {unListCA = [Just 1,Just 4], unListCB = [Just True], unListCC = [Just LT]}
->>> last $ testListCCmapM
+>>> last testListCCmapM
 ListC {unListCA = [Just 3,Just 5], unListCB = [Just False], unListCC = [Just GT]}
 -}
 testListCCmapM :: [ListC Int Bool Ordering Maybe]
