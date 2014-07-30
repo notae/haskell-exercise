@@ -14,8 +14,6 @@ import Control.Monad.State (runState)
 import Control.Monad.State (evalState)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 -- Interface for variable binding
 
@@ -31,6 +29,31 @@ type IMVarId = IntMap.Key
 
 data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
 
+class IMVarIdStore m where
+  getId :: m IMVarId
+  setId :: IMVarId -> m ()
+
+class IMMap m v where
+  getMap :: m (IntMap v)
+  setMap :: IntMap v -> m ()
+
+instance (MonadState s m, IMVarIdStore m, IMMap m v) => Binding m v where
+  type Var m v = IMVar v
+  newVar v = do
+    vid <- getId
+    setId $ vid + 1
+    let var = IMVar vid
+    updateVar var v
+    return var
+  lookupVar (IMVar vid) = do
+    si <- getMap
+    return $ si IntMap.! vid
+  updateVar (IMVar vid) v = do
+    si <- getMap
+    setMap $ IntMap.insert vid v si
+
+--   Declaration per type
+
 data IMEnv =
   IMEnv
   { imNextId :: IMVarId
@@ -45,32 +68,15 @@ initIMEnv =
   , imIMap    = IntMap.empty
   , imBMap    = IntMap.empty }
 
-class MonadState IMEnv m => IMBinding m v where
-  getMap :: m (IntMap v)
-  setMap :: IntMap v -> m ()
+instance MonadState IMEnv m => IMVarIdStore m where
+  getId = gets imNextId
+  setId vid = modify $ \s -> s { imNextId = vid }
 
-instance IMBinding m v => Binding m v where
-  type Var m v = IMVar v
-  newVar v = do
-    vid <- gets imNextId
-    modify $ \s -> s { imNextId = vid + 1 }
-    let var = IMVar vid
-    updateVar var v
-    return var
-  lookupVar (IMVar vid) = do
-    si <- getMap
-    return $ si IntMap.! vid
-  updateVar (IMVar vid) v = do
-    si <- getMap
-    setMap $ IntMap.insert vid v si
-
--- Declaration per type
-
-instance MonadState IMEnv m => IMBinding m Int where
+instance MonadState IMEnv m => IMMap m Int where
   getMap = gets imIMap
   setMap m = modify $ \s -> s { imIMap = m }
 
-instance MonadState IMEnv m => IMBinding m Bool where
+instance MonadState IMEnv m => IMMap m Bool where
   getMap = gets imBMap
   setMap m = modify $ \s -> s { imBMap = m }
 
