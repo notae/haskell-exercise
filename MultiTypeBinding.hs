@@ -29,9 +29,9 @@ class MonadState s m => Binding m s v where
 
 data IMEnv =
   IMEnv
-  { fdNextId :: IMVarId
-  , fdIMap :: IntMap Int
-  , fdBMap :: IntMap Bool }
+  { imNextId :: IMVarId
+  , imIMap :: IntMap Int
+  , imBMap :: IntMap Bool }
   deriving (Show)
 
 data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
@@ -39,9 +39,9 @@ data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
 initIMEnv :: IMEnv
 initIMEnv =
   IMEnv
-  { fdNextId = 0
-  , fdIMap    = IntMap.empty
-  , fdBMap    = IntMap.empty }
+  { imNextId = 0
+  , imIMap    = IntMap.empty
+  , imBMap    = IntMap.empty }
 
 type IMVarId = IntMap.Key
 
@@ -52,8 +52,8 @@ class MonadState IMEnv m => IMBinding m v where
 instance IMBinding m v => Binding m IMEnv v where
   type Var m IMEnv v = IMVar v
   newVar v = do
-    vid <- gets fdNextId
-    modify $ \s -> s { fdNextId = vid + 1 }
+    vid <- gets imNextId
+    modify $ \s -> s { imNextId = vid + 1 }
     let var = IMVar vid
     updateVar var v
     return var
@@ -67,12 +67,12 @@ instance IMBinding m v => Binding m IMEnv v where
 -- Declaration per type
 
 instance MonadState IMEnv m => IMBinding m Int where
-  getMap = gets fdIMap
-  setMap m = modify $ \s -> s { fdIMap = m }
+  getMap = gets imIMap
+  setMap m = modify $ \s -> s { imIMap = m }
 
 instance MonadState IMEnv m => IMBinding m Bool where
-  getMap = gets fdBMap
-  setMap m = modify $ \s -> s { fdBMap = m }
+  getMap = gets imBMap
+  setMap m = modify $ \s -> s { imBMap = m }
 
 -- Example for use
 
@@ -90,7 +90,7 @@ prog = do
 
 {-|
 >>> test
-(((123,True),(456,False)),IMEnv {fdNextId = 2, fdIMap = fromList [(0,456)], fdBMap = fromList [(1,False)]})
+(((123,True),(456,False)),IMEnv {imNextId = 2, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)]})
 -}
 test :: (((Int, Bool), (Int, Bool)), IMEnv)
 test = runState prog initIMEnv
