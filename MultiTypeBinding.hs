@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import Control.Monad.State (MonadState)
 import Control.Monad.State (gets)
@@ -17,65 +17,70 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 
-type VarId = IntMap.Key
-newtype Var v = Var { varId :: VarId } deriving (Show, Eq)
+class MonadState s m => Binding m s v where
+  type family Var m s v :: *
+  newVar    :: v         -> m (Var m s v)
+  lookupVar :: Var m s v -> m v
+  updateVar :: Var m s v -> v -> m ()
 
-data Env =
-  Env
-  { fdINextId :: VarId
+
+data IMEnv =
+  IMEnv
+  { fdINextId :: IMVarId
   , fdIMap :: IntMap Int
-  , fdBNextId :: VarId
+  , fdBNextId :: IMVarId
   , fdBMap :: IntMap Bool }
   deriving (Show)
 
-initState :: Env
+data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
+
+initState :: IMEnv
 initState =
-  Env
+  IMEnv
   { fdINextId = 0
   , fdIMap    = IntMap.empty
   , fdBNextId = 0
   , fdBMap    = IntMap.empty }
 
-class MonadState s m => Binding m s v where
-  newVar    :: v     -> m (Var v)
-  lookupVar :: Var v -> m v
-  updateVar :: Var v -> v -> m ()
+type IMVarId = IntMap.Key
 
-instance MonadState Env m => Binding m Env Int where
+instance MonadState IMEnv m => Binding m IMEnv Int where
+  type Var m IMEnv Int = IMVar Int
   newVar v = do
     vid <- gets fdINextId
     modify $ \s -> s { fdINextId = vid + 1 }
-    let var = Var vid
+    let var = IMVar vid
     updateVar var v
     return var
-  lookupVar (Var vid) = do
+  lookupVar (IMVar vid) = do
     si <- gets fdIMap
     return $ si IntMap.! vid
-  updateVar (Var vid) v = do
+  updateVar (IMVar vid) v = do
     si <- gets fdIMap
     modify $ \s -> s { fdIMap = IntMap.insert vid v si }
 
-instance MonadState Env m => Binding m Env Bool where
+instance MonadState IMEnv m => Binding m IMEnv Bool where
+  type Var m IMEnv Bool = IMVar Bool
   newVar v = do
     vid <- gets fdBNextId
     modify $ \s -> s { fdBNextId = vid + 1 }
-    let var = Var vid
+    let var = IMVar vid
     updateVar var v
     return var
-  lookupVar (Var vid) = do
+  lookupVar (IMVar vid) = do
     si <- gets fdBMap
     return $ si IntMap.! vid
-  updateVar (Var vid) v = do
+  updateVar (IMVar vid) v = do
     sb <- gets fdBMap
     modify $ \s -> s { fdBMap = IntMap.insert vid v sb }
 
-prog :: State Env ((Int, Bool), (Int, Bool))
+prog :: State IMEnv ((Int, Bool), (Int, Bool))
 prog = do
-  vi <- newVar 123
+  vi <- newVar (123::Int)
   vb <- newVar True
   i1 <- lookupVar vi
   b1 <- lookupVar vb
-  updateVar vi 456
+  updateVar vi (456::Int)
   updateVar vb False
   i2 <- lookupVar vi
   b2 <- lookupVar vb
@@ -83,7 +88,7 @@ prog = do
 
 {-|
 >>> test
-(((123,True),(456,False)),Env {fdINextId = 1, fdIMap = fromList [(0,456)], fdBNextId = 1, fdBMap = fromList [(0,False)]})
+(((123,True),(456,False)),IMEnv {fdINextId = 1, fdIMap = fromList [(0,456)], fdBNextId = 1, fdBMap = fromList [(0,False)]})
 -}
-test :: (((Int, Bool), (Int, Bool)), Env)
+test :: (((Int, Bool), (Int, Bool)), IMEnv)
 test = runState prog initState
