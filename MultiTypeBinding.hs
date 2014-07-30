@@ -36,12 +36,12 @@ initState =
   , fdBNextId = 0
   , fdBMap    = IntMap.empty }
 
-class MonadState Env m => ReadState m v where
+class MonadState s m => Binding m s v where
   newVar    :: v     -> m (Var v)
   lookupVar :: Var v -> m v
   updateVar :: Var v -> v -> m ()
 
-instance MonadState Env m => ReadState m Int where
+instance MonadState Env m => Binding m Env Int where
   newVar v = do
     vid <- gets fdINextId
     modify $ \s -> s { fdINextId = vid + 1 }
@@ -55,7 +55,7 @@ instance MonadState Env m => ReadState m Int where
     si <- gets fdIMap
     modify $ \s -> s { fdIMap = IntMap.insert vid v si }
 
-instance MonadState Env m => ReadState m Bool where
+instance MonadState Env m => Binding m Env Bool where
   newVar v = do
     vid <- gets fdBNextId
     modify $ \s -> s { fdBNextId = vid + 1 }
