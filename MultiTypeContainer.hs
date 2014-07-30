@@ -56,7 +56,7 @@ data ListC a b c t =
 instance Container (ListC a b c) where
   cmap  f (ListC as bs cs) = ListC (fmap f as) (fmap f bs) (fmap f cs)
   cmapA f (ListC as bs cs) =
-    ListC <$> (traverse f as) <*> (traverse f bs) <*> (traverse f cs)
+    ListC <$> traverse f as <*> traverse f bs <*> traverse f cs
 
 listc :: ListC Int Bool Ordering []
 listc = ListC [[1..3], [4..5]] [[True, False]] [[LT, GT]]
@@ -77,3 +77,27 @@ ListC {unListCA = [Just 3,Just 5], unListCB = [Just False], unListCC = [Just GT]
 -}
 testListCCmapM :: [ListC Int Bool Ordering Maybe]
 testListCCmapM = cmapM (map Just) listc
+
+-- containing container
+
+newtype PairList x y t = PairList { unPairList :: [(t x, t y)] }
+                       deriving (Show, Eq)
+
+instance (Enum x, Ord x, Enum y, Ord y) =>
+         Container (PairList x y) where
+  cmap f (PairList ps) = PairList $ fmap (\(x, y) -> (f x, f y)) ps
+  cmapA f (PairList ps) =
+    PairList <$> traverse (\(tx, ty) -> (,) <$> f tx <*> f ty) ps
+
+pairList :: PairList Integer Bool []
+pairList = PairList [ ([1..3], [True, False])
+                    , ([4..5], [True, False]) ]
+
+testPairListCmap :: PairList Integer Bool Maybe
+testPairListCmap  = cmap listToMaybe pairList
+
+testPairListCmapA :: [PairList Integer Bool Maybe]
+testPairListCmapA = cmapA (map Just) pairList
+
+testPairListCmapM :: [PairList Integer Bool Maybe]
+testPairListCmapM = cmapM (map Just) pairList
