@@ -1,4 +1,4 @@
--- Example of Multiple Type Binding
+-- Example of Multiple Type Binding over MonadState
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -17,7 +17,7 @@ import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 
--- Interface for variable binding
+-- Interface for variable binding over MonadState
 
 class MonadState s m => Binding m s v where
   type family Var m s v :: *
