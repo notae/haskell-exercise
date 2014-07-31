@@ -29,60 +29,60 @@ type IMVarId = IntMap.Key
 
 data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
 
-class IMVarIdStore m where
-  getId :: m IMVarId
-  setId :: IMVarId -> m ()
+class IMEnvId e where
+  getId :: e -> IMVarId
+  setId :: e -> IMVarId -> e
 
-class IMMap m v where
-  getMap :: m (IntMap v)
-  setMap :: IntMap v -> m ()
+class IMEnvMap e v where
+  getMap :: e -> IntMap v
+  setMap :: e -> IntMap v -> e
 
-instance (MonadState s m, IMVarIdStore m, IMMap m v) => Binding m v where
+instance (MonadState s m, IMEnvId s, IMEnvMap s v) => Binding m v where
   type Var m v = IMVar v
   newVar v = do
-    vid <- getId
-    setId $ vid + 1
+    vid <- gets getId
+    modify $ \s -> setId s (vid + 1)
     let var = IMVar vid
     updateVar var v
     return var
   lookupVar (IMVar vid) = do
-    si <- getMap
+    si <- gets getMap
     return $ si IntMap.! vid
   updateVar (IMVar vid) v = do
-    si <- getMap
-    setMap $ IntMap.insert vid v si
+    si <- gets getMap
+    modify $ \s -> setMap s $ IntMap.insert vid v si
 
 --   Declaration per type
 
-data IMEnv =
-  IMEnv
+data MyIMEnv =
+  MyIMEnv
   { imNextId :: IMVarId
   , imIMap :: IntMap Int
   , imBMap :: IntMap Bool }
   deriving (Show)
 
-initIMEnv :: IMEnv
-initIMEnv =
-  IMEnv
+initMyIMEnv :: MyIMEnv
+initMyIMEnv =
+  MyIMEnv
   { imNextId = 0
   , imIMap    = IntMap.empty
   , imBMap    = IntMap.empty }
 
-instance MonadState IMEnv m => IMVarIdStore m where
-  getId = gets imNextId
-  setId vid = modify $ \s -> s { imNextId = vid }
+instance IMEnvId MyIMEnv where
+  getId = imNextId
+  setId e vid = e { imNextId = vid }
 
-instance MonadState IMEnv m => IMMap m Int where
-  getMap = gets imIMap
-  setMap m = modify $ \s -> s { imIMap = m }
+instance IMEnvMap MyIMEnv Int where
+  getMap = imIMap
+  setMap e m = e { imIMap = m }
 
-instance MonadState IMEnv m => IMMap m Bool where
-  getMap = gets imBMap
-  setMap m = modify $ \s -> s { imBMap = m }
+instance IMEnvMap MyIMEnv Bool where
+  getMap = imBMap
+  setMap e m = e { imBMap = m }
 
 -- Example for use
 
-progIM :: State IMEnv ((Int, Bool), (Int, Bool))
+progIM :: State MyIMEnv ((Int, Bool), (Int, Bool))
 progIM = do
   vi <- newVar 123
   vb <- newVar True
@@ -96,17 +96,17 @@ progIM = do
 
 {-|
 >>> testIM
-(((123,True),(456,False)),IMEnv {imNextId = 2, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)]})
+(((123,True),(456,False)),MyIMEnv {imNextId = 2, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)]})
 -}
-testIM :: (((Int, Bool), (Int, Bool)), IMEnv)
-testIM = runState progIM initIMEnv
+testIM :: (((Int, Bool), (Int, Bool)), MyIMEnv)
+testIM = runState progIM initMyIMEnv
 
-progIM2New :: State IMEnv (IMVar Int)
+progIM2New :: State MyIMEnv (IMVar Int)
 progIM2New = newVar 123
 
-progIM2Use :: IMVar Int -> State IMEnv Int
+progIM2Use :: IMVar Int -> State MyIMEnv Int
 progIM2Use v = lookupVar v
 
 -- Should causes type error
-testIM2 :: (Int, IMEnv)
-testIM2 = runState (progIM2Use (evalState progIM2New initIMEnv)) initIMEnv
+testIM2 :: (Int, MyIMEnv)
+testIM2 = runState (progIM2Use (evalState progIM2New initMyIMEnv)) initMyIMEnv
