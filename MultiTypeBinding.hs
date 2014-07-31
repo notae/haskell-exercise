@@ -57,16 +57,18 @@ instance (MonadState s m, IMEnvId s, IMEnvMap s v) => Binding m v where
 data MyIMEnv =
   MyIMEnv
   { imNextId :: IMVarId
-  , imIMap :: IntMap Int
-  , imBMap :: IntMap Bool }
+  , imIMap   :: IntMap Int
+  , imBMap   :: IntMap Bool
+  , imCMap   :: IntMap Color }
   deriving (Show)
 
 initMyIMEnv :: MyIMEnv
 initMyIMEnv =
   MyIMEnv
   { imNextId = 0
-  , imIMap    = IntMap.empty
-  , imBMap    = IntMap.empty }
+  , imIMap   = IntMap.empty
+  , imBMap   = IntMap.empty
+  , imCMap   = IntMap.empty }
 
 instance IMEnvId MyIMEnv where
   getId = imNextId
@@ -80,25 +82,35 @@ instance IMEnvMap MyIMEnv Bool where
   getMap = imBMap
   setMap e m = e { imBMap = m }
 
+data Color = Red | Green | Blue deriving (Show)
+
+instance IMEnvMap MyIMEnv Color where
+  getMap = imCMap
+  setMap e m = e { imCMap = m }
+
 -- Example for use
 
-progIM :: State MyIMEnv ((Int, Bool), (Int, Bool))
+progIM :: State MyIMEnv ((Int, Bool, Color), (Int, Bool, Color))
 progIM = do
   vi <- newVar 123
   vb <- newVar True
+  vc <- newVar Red
   i1 <- lookupVar vi
   b1 <- lookupVar vb
+  c1 <- lookupVar vc
   updateVar vi 456
   updateVar vb False
+  updateVar vc Blue
   i2 <- lookupVar vi
   b2 <- lookupVar vb
-  return ((i1, b1), (i2, b2))
+  c2 <- lookupVar vc
+  return ((i1, b1, c1), (i2, b2, c2))
 
 {-|
 >>> testIM
-(((123,True),(456,False)),MyIMEnv {imNextId = 2, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)]})
+(((123,True,Red),(456,False,Blue)),MyIMEnv {imNextId = 3, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)], imCMap = fromList [(2,Blue)]})
 -}
-testIM :: (((Int, Bool), (Int, Bool)), MyIMEnv)
+testIM :: (((Int, Bool, Color), (Int, Bool, Color)), MyIMEnv)
 testIM = runState progIM initMyIMEnv
 
 progIM2New :: State MyIMEnv (IMVar Int)
