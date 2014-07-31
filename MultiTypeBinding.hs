@@ -21,17 +21,17 @@ import Control.Applicative (Applicative)
 
 -- Interface for variable binding
 
-class Monad m => Binding m v where
-  type family Var m v :: *
-  newVar    :: v       -> m (Var m v)
-  lookupVar :: Var m v -> m v
-  updateVar :: Var m v -> v -> m ()
+class Monad (m s) => Binding m s v where
+  type family Var m s v :: *
+  newVar    :: v         -> (m s) (Var m s v)
+  lookupVar :: Var m s v -> (m s) v
+  updateVar :: Var m s v -> v -> (m s) ()
 
 -- An implementation of binding with State monad + IntMap
 
 type IMVarId = IntMap.Key
 
-data IMVar v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
+data IMVar s v = IMVar { imVarId :: IMVarId } deriving (Show, Eq)
 
 class IMEnvId e where
   getId :: e -> IMVarId
@@ -41,8 +41,12 @@ class IMEnvMap e v where
   getMap :: e -> IntMap v
   setMap :: e -> IntMap v -> e
 
-instance (MonadState s m, IMEnvId s, IMEnvMap s v) => Binding m v where
-  type Var m v = IMVar v
+newtype IM e s a =
+  IM { unIM :: State e a }
+  deriving (Functor, Applicative, Monad, MonadState e)
+
+instance (IMEnvId e , IMEnvMap e v) => Binding (IM e) s v where
+  type Var (IM e) s v = IMVar s v
   newVar v = do
     vid <- gets getId
     modify $ \s -> setId s (vid + 1)
@@ -55,6 +59,12 @@ instance (MonadState s m, IMEnvId s, IMEnvMap s v) => Binding m v where
   updateVar (IMVar vid) v = do
     si <- gets getMap
     modify $ \s -> setMap s $ IntMap.insert vid v si
+
+runIM :: (forall s. IM e s a) -> e -> (a, e)
+runIM im initialEnv = runState (unIM im) initialEnv
+
+evalIM :: (forall s. IM e s a) -> e -> a
+evalIM im initialEnv = evalState (unIM im) initialEnv
 
 --   Declaration per type
 
@@ -74,6 +84,12 @@ initialMyIMEnv =
   , imBMap   = IntMap.empty
   , imCMap   = IntMap.empty }
 
+runMyIM0 :: (forall s. IM MyIMEnv s a) -> (a, MyIMEnv)
+runMyIM0 im = runIM im initialMyIMEnv
+
+evalMyIM0 :: (forall s. IM MyIMEnv s a) -> a
+evalMyIM0 im = evalIM im initialMyIMEnv
+
 instance IMEnvId MyIMEnv where
   getId = imNextId
   setId e vid = e { imNextId = vid }
@@ -92,19 +108,10 @@ instance IMEnvMap MyIMEnv Color where
   getMap = imCMap
   setMap e m = e { imCMap = m }
 
-newtype IM s e a =
-  IM { unIM :: State e a }
-  deriving (Functor, Applicative, Monad, MonadState e)
-
-runIM :: (forall s. IM s e a) -> e -> (a, e)
-runIM im initialEnv = runState (unIM im) initialEnv
-
-evalIM :: (forall s. IM s e a) -> e -> a
-evalIM im initialEnv = evalState (unIM im) initialEnv
-
 -- Example for use
 
-prog :: (Binding m Bool, Binding m Color) => m ((Bool, Color), (Bool, Color))
+prog :: (Binding m s Bool, Binding m s Color) =>
+        m s ((Bool, Color), (Bool, Color))
 prog = do
   vb <- newVar True
   vc <- newVar Red
@@ -123,14 +130,25 @@ prog = do
 testIM :: (((Bool, Color), (Bool, Color)), MyIMEnv)
 testIM = runIM prog initialMyIMEnv
 
---   with phantom type parameter
+--   Type check with phantom type parameter
 
-progIM2New :: (Binding m Int) => m (Var m Int)
-progIM2New = newVar 123
+--     Exporting variable should cause type error
 
-progIM2Use :: (Binding m Int) => Var m Int -> m Int
-progIM2Use v = lookupVar v
+-- progIMExportError :: (Binding m s Int) => m s (Var m s Int)
+-- progIMExportError = newVar (123::Int)
 
---     Should causes type error
-testIM2 :: (Int, MyIMEnv)
-testIM2 = runIM (progIM2Use (evalIM progIM2New initialMyIMEnv)) initialMyIMEnv
+-- progIMExportError :: IM MyIMEnv s (Var (IM MyIMEnv) s Int)
+-- progIMExportError = newVar 123
+
+-- testIMExportError = runMyIM0 (newVar 123)
+
+--     Importing variable should cause type error
+
+-- progIMImportError :: (Binding m s Int) => Var m s Int -> m s Int
+-- progIMImportError v = lookupVar v
+
+-- progIMImportError :: Var (IM MyIMEnv) s Int -> IM MyIMEnv s Int
+-- progIMImportError v = lookupVar v
+
+-- testIMImportError :: Var (IM MyIMEnv) s Int -> (Int, MyIMEnv)
+-- testIMImportError v = runMyIM0 (lookupVar v)
