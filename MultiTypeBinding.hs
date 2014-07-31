@@ -9,15 +9,21 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 
+import Control.Applicative (Applicative)
+import Control.Monad.ST (ST)
+import Control.Monad.ST (runST)
 import Control.Monad.State (MonadState)
+import Control.Monad.State (State)
+import Control.Monad.State (evalState)
 import Control.Monad.State (gets)
 import Control.Monad.State (modify)
-import Control.Monad.State (State)
 import Control.Monad.State (runState)
-import Control.Monad.State (evalState)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Control.Applicative (Applicative)
+import Data.STRef (STRef)
+import Data.STRef (newSTRef)
+import Data.STRef (readSTRef)
+import Data.STRef (writeSTRef)
 
 -- Interface for variable binding
 
@@ -26,6 +32,14 @@ class Monad (m s) => Binding m s v where
   newVar    :: v         -> (m s) (Var m s v)
   lookupVar :: Var m s v -> (m s) v
   updateVar :: Var m s v -> v -> (m s) ()
+
+-- An implementation of binding with ST monads
+
+instance Binding ST s v where
+  type Var ST s v = STRef s v
+  newVar = newSTRef
+  lookupVar r = readSTRef r
+  updateVar r v = writeSTRef r v
 
 -- An implementation of binding with State monad + IntMap
 
@@ -124,13 +138,20 @@ prog = do
   return ((b, c), (b', c'))
 
 {-|
+>>> testST
+((True,Red),(False,Blue))
+-}
+testST :: ((Bool, Color), (Bool, Color))
+testST = runST prog
+
+{-|
 >>> testIM
 (((True,Red),(False,Blue)),MyIMEnv {imNextId = 2, imIMap = fromList [], imBMap = fromList [(0,False)], imCMap = fromList [(1,Blue)]})
 -}
 testIM :: (((Bool, Color), (Bool, Color)), MyIMEnv)
 testIM = runIM prog initialMyIMEnv
 
---   Type check with phantom type parameter
+-- Type check with phantom type parameter
 
 --     Exporting variable should cause type error
 
