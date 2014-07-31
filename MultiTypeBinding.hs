@@ -5,6 +5,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 
 import Control.Monad.State (MonadState)
 import Control.Monad.State (gets)
@@ -14,6 +17,7 @@ import Control.Monad.State (runState)
 import Control.Monad.State (evalState)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Control.Applicative (Applicative)
 
 -- Interface for variable binding
 
@@ -62,8 +66,8 @@ data MyIMEnv =
   , imCMap   :: IntMap Color }
   deriving (Show)
 
-initMyIMEnv :: MyIMEnv
-initMyIMEnv =
+initialMyIMEnv :: MyIMEnv
+initialMyIMEnv =
   MyIMEnv
   { imNextId = 0
   , imIMap   = IntMap.empty
@@ -88,37 +92,45 @@ instance IMEnvMap MyIMEnv Color where
   getMap = imCMap
   setMap e m = e { imCMap = m }
 
+newtype IM s e a =
+  IM { unIM :: State e a }
+  deriving (Functor, Applicative, Monad, MonadState e)
+
+runIM :: (forall s. IM s e a) -> e -> (a, e)
+runIM im initialEnv = runState (unIM im) initialEnv
+
+evalIM :: (forall s. IM s e a) -> e -> a
+evalIM im initialEnv = evalState (unIM im) initialEnv
+
 -- Example for use
 
-progIM :: State MyIMEnv ((Int, Bool, Color), (Int, Bool, Color))
-progIM = do
-  vi <- newVar 123
+prog :: (Binding m Bool, Binding m Color) => m ((Bool, Color), (Bool, Color))
+prog = do
   vb <- newVar True
   vc <- newVar Red
-  i1 <- lookupVar vi
-  b1 <- lookupVar vb
-  c1 <- lookupVar vc
-  updateVar vi 456
+  b <- lookupVar vb
+  c <- lookupVar vc
   updateVar vb False
   updateVar vc Blue
-  i2 <- lookupVar vi
-  b2 <- lookupVar vb
-  c2 <- lookupVar vc
-  return ((i1, b1, c1), (i2, b2, c2))
+  b' <- lookupVar vb
+  c' <- lookupVar vc
+  return ((b, c), (b', c'))
 
 {-|
 >>> testIM
-(((123,True,Red),(456,False,Blue)),MyIMEnv {imNextId = 3, imIMap = fromList [(0,456)], imBMap = fromList [(1,False)], imCMap = fromList [(2,Blue)]})
+(((True,Red),(False,Blue)),MyIMEnv {imNextId = 2, imIMap = fromList [], imBMap = fromList [(0,False)], imCMap = fromList [(1,Blue)]})
 -}
-testIM :: (((Int, Bool, Color), (Int, Bool, Color)), MyIMEnv)
-testIM = runState progIM initMyIMEnv
+testIM :: (((Bool, Color), (Bool, Color)), MyIMEnv)
+testIM = runIM prog initialMyIMEnv
 
-progIM2New :: State MyIMEnv (IMVar Int)
+--   with phantom type parameter
+
+progIM2New :: (Binding m Int) => m (Var m Int)
 progIM2New = newVar 123
 
-progIM2Use :: IMVar Int -> State MyIMEnv Int
+progIM2Use :: (Binding m Int) => Var m Int -> m Int
 progIM2Use v = lookupVar v
 
--- Should causes type error
+--     Should causes type error
 testIM2 :: (Int, MyIMEnv)
-testIM2 = runState (progIM2Use (evalState progIM2New initMyIMEnv)) initMyIMEnv
+testIM2 = runIM (progIM2Use (evalIM progIM2New initialMyIMEnv)) initialMyIMEnv
