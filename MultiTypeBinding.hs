@@ -6,29 +6,32 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 
+import Control.Applicative (Alternative)
 import Control.Applicative (Applicative)
+import Control.Monad (MonadPlus)
 import Control.Monad.ST (ST)
 import Control.Monad.ST (runST)
 import Control.Monad.State (MonadState)
-import Control.Monad.State (State)
-import Control.Monad.State (evalState)
+import Control.Monad.State (StateT)
+import Control.Monad.State (evalStateT)
 import Control.Monad.State (gets)
 import Control.Monad.State (modify)
-import Control.Monad.State (runState)
+import Control.Monad.State (runStateT)
+import Data.Functor.Identity (runIdentity)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.STRef (STRef)
 import Data.STRef (newSTRef)
 import Data.STRef (readSTRef)
 import Data.STRef (writeSTRef)
+import Control.Monad.Trans (lift)
 
 -- Interface for variable binding
 
 class Monad (m s) => Binding m s v where
-  type family Var m s v :: *
+  type Var m s v :: *
   newVar    :: v         -> (m s) (Var m s v)
   lookupVar :: Var m s v -> (m s) v
   updateVar :: Var m s v -> v -> (m s) ()
@@ -38,8 +41,8 @@ class Monad (m s) => Binding m s v where
 instance Binding ST s v where
   type Var ST s v = STRef s v
   newVar = newSTRef
-  lookupVar r = readSTRef r
-  updateVar r v = writeSTRef r v
+  lookupVar = readSTRef
+  updateVar = writeSTRef
 
 -- An implementation of binding with State monad + IntMap
 
@@ -55,12 +58,13 @@ class IMEnvMap e v where
   getMap :: e -> IntMap v
   setMap :: e -> IntMap v -> e
 
-newtype IM e s a =
-  IM { unIM :: State e a }
-  deriving (Functor, Applicative, Monad, MonadState e)
+newtype IM e m s a =
+  IM { unIM :: StateT e m a }
+  deriving (Functor, Applicative, Alternative,
+            Monad, MonadPlus, MonadState e)
 
-instance (IMEnvId e , IMEnvMap e v) => Binding (IM e) s v where
-  type Var (IM e) s v = IMVar s v
+instance (Monad m, IMEnvId e , IMEnvMap e v) => Binding (IM e m) s v where
+  type Var (IM e m) s v = IMVar s v
   newVar v = do
     vid <- gets getId
     modify $ \s -> setId s (vid + 1)
@@ -74,11 +78,11 @@ instance (IMEnvId e , IMEnvMap e v) => Binding (IM e) s v where
     si <- gets getMap
     modify $ \s -> setMap s $ IntMap.insert vid v si
 
-runIM :: (forall s. IM e s a) -> e -> (a, e)
-runIM im initialEnv = runState (unIM im) initialEnv
+runIM :: (forall s. IM e m s a) -> e -> m (a, e)
+runIM im = runStateT (unIM im)
 
-evalIM :: (forall s. IM e s a) -> e -> a
-evalIM im initialEnv = evalState (unIM im) initialEnv
+evalIM :: Monad m => (forall s. IM e m s a) -> e -> m a
+evalIM im = evalStateT (unIM im)
 
 --   Declaration per type
 
@@ -87,7 +91,10 @@ data MyIMEnv =
   { imNextId :: IMVarId
   , imIMap   :: IntMap Int
   , imBMap   :: IntMap Bool
-  , imCMap   :: IntMap Color }
+  , imCMap   :: IntMap Color
+  , imILMap  :: IntMap [Int]
+  , imBLMap  :: IntMap [Bool]
+  , imCLMap  :: IntMap [Color] }
   deriving (Show)
 
 initialMyIMEnv :: MyIMEnv
@@ -96,12 +103,15 @@ initialMyIMEnv =
   { imNextId = 0
   , imIMap   = IntMap.empty
   , imBMap   = IntMap.empty
-  , imCMap   = IntMap.empty }
+  , imCMap   = IntMap.empty
+  , imILMap   = IntMap.empty
+  , imBLMap   = IntMap.empty
+  , imCLMap   = IntMap.empty }
 
-runMyIM0 :: (forall s. IM MyIMEnv s a) -> (a, MyIMEnv)
+runMyIM0 :: (forall s. IM MyIMEnv m s a) -> m (a, MyIMEnv)
 runMyIM0 im = runIM im initialMyIMEnv
 
-evalMyIM0 :: (forall s. IM MyIMEnv s a) -> a
+evalMyIM0 :: Monad m => (forall s. IM MyIMEnv m s a) -> m a
 evalMyIM0 im = evalIM im initialMyIMEnv
 
 instance IMEnvId MyIMEnv where
@@ -121,6 +131,18 @@ data Color = Red | Green | Blue deriving (Show)
 instance IMEnvMap MyIMEnv Color where
   getMap = imCMap
   setMap e m = e { imCMap = m }
+
+instance IMEnvMap MyIMEnv [Int] where
+  getMap = imILMap
+  setMap e m = e { imILMap = m }
+
+instance IMEnvMap MyIMEnv [Bool] where
+  getMap = imBLMap
+  setMap e m = e { imBLMap = m }
+
+instance IMEnvMap MyIMEnv [Color] where
+  getMap = imCLMap
+  setMap e m = e { imCLMap = m }
 
 -- Example for use
 
@@ -149,7 +171,22 @@ testST = runST prog
 (((True,Red),(False,Blue)),MyIMEnv {imNextId = 2, imIMap = fromList [], imBMap = fromList [(0,False)], imCMap = fromList [(1,Blue)]})
 -}
 testIM :: (((Bool, Color), (Bool, Color)), MyIMEnv)
-testIM = runIM prog initialMyIMEnv
+testIM = runIdentity $ runMyIM0 prog
+
+-- with List monad as inner monad
+{-|
+>>> testIML
+[(True,Red),(True,Green),(True,Blue),(False,Red),(False,Green),(False,Blue)]
+-}
+testIML :: [(Bool, Color)]
+testIML = evalMyIM0 $ do
+  vb <- newVar [True, False]
+  vc <- newVar [Red, Green, Blue]
+  lb <- lookupVar vb
+  lc <- lookupVar vc
+  b <- IM $ lift lb
+  c <- IM $ lift lc
+  return (b, c)
 
 -- Type check with phantom type parameter
 
