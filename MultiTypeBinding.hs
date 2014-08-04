@@ -31,7 +31,7 @@ import Control.Monad.Trans (lift)
 -- Interface for variable binding
 
 class Monad (m s) => Binding m s v where
-  type Var m s v :: *
+  type Var m s :: * -> *
   newVar    :: v         -> (m s) (Var m s v)
   lookupVar :: Var m s v -> (m s) v
   updateVar :: Var m s v -> v -> (m s) ()
@@ -39,7 +39,7 @@ class Monad (m s) => Binding m s v where
 -- An implementation of binding with ST monads
 
 instance Binding ST s v where
-  type Var ST s v = STRef s v
+  type Var ST s = STRef s
   newVar = newSTRef
   lookupVar = readSTRef
   updateVar = writeSTRef
@@ -64,7 +64,7 @@ newtype IM e m s a =
             Monad, MonadPlus, MonadState e)
 
 instance (Monad m, IMEnvId e , IMEnvMap e v) => Binding (IM e m) s v where
-  type Var (IM e m) s v = IMVar s v
+  type Var (IM e m) s = IMVar s
   newVar v = do
     vid <- gets getId
     modify $ \s -> setId s (vid + 1)
