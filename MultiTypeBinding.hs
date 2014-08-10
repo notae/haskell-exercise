@@ -84,7 +84,7 @@ runIM im = runStateT (unIM im)
 evalIM :: Monad m => (forall s. IM e m s a) -> e -> m a
 evalIM im = evalStateT (unIM im)
 
---   Declaration per type (with aconcrete types)
+--   Declaration per type (with concrete types)
 
 data MyIMEnv =
   MyIMEnv
