@@ -26,9 +26,7 @@ readonly CABAL_SYS=/usr/bin/cabal
 readonly CABAL_USR="${HOME}/Library/Haskell/bin/cabal"
 readonly USR_BIN_DIR="${HOME}/Library/Haskell/bin"
 readonly DEST_DIRS="${HOME}/.ghc ${HOME}/.cabal ${HOME}/Library/Haskell"
-
-readonly SANDBOX_ID=$$
-readonly SANDBOX_DIR="/tmp/ghc_setup_home-${USER}-${SANDBOX_ID}"
+readonly SANDBOX_DIR="${HOME}/Library/Haskell/tools"
 
 export PATH="${USR_BIN_DIR}:/usr/bin:/bin:/usr/sbin:/sbin"
 
@@ -68,11 +66,8 @@ msg "Setup ghc-mod, hlint ..."
 ${MKDIR} ${SANDBOX_DIR}
 pushd ${SANDBOX_DIR}
 ${CABAL_USR} sandbox init
-${CABAL_USR} install -j ghc-mod
-${CP} -a .cabal-sandbox/bin/* ${USR_BIN_DIR}
-${CABAL_USR} sandbox delete
+${CABAL_USR} install -j ghc-mod hlint doctest
 popd
-${RM} -rf ${SANDBOX_DIR}
 
 msg "${TITLE} was completed."
 exit 0
