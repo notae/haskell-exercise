@@ -9,10 +9,14 @@
 # Stability   : experimental
 # Portability : POSIX
 #
-#   This script do following action:
+#   This script do the following action:
 #     (1) Clean GHC/Cabal directories in your home directory.
-#     (2) Install latest cabal from Hacakge by cabal in Haskell Platform.
-#     (3) Install latest ghc-mod command from Hacakge by new cabal.
+#     (2) Install latest cabal from Hackage by cabal in Haskell Platform.
+#     (3) Install latest ghc-mod command from Hackage by new cabal.
+#
+#   Please add the following paths to your $PATH:
+#     ${HOME}/Library/Haskell/tools/.cabal-sandbox/bin
+#     ${HOME}/Library/Haskell/bin
 #
 
 readonly TITLE="GHC/Cabal Setup"
