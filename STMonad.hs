@@ -81,49 +81,85 @@ progL = do
   -- return vs'
 
 
--- stack
+-- Multiple type stacks
 
-type Manager s = STRef s (ST s ())
+data Manager s = Manager { pushs :: ST s ()
+                         , pops  :: ST s () }
 
-data Stack s a = Stack { unStack :: [a]
-                       , manager :: Manager s }
-emptyStack :: Manager s -> Stack s a
-emptyStack m = Stack [] m
+newManager :: ST s (STRef s (Manager s))
+newManager = newSTRef $ Manager (return ()) (return ())
 
-newManager :: ST s (Manager s)
-newManager = newSTRef (return ())
+-- | Create a new stack
+new :: STRef s (Manager s) -> a -> ST s (STRef s [a])
+new rm a = do
+  r <- newSTRef [a]
+  modifySTRef rm $ \m -> m { pushs = pushs m >> pushV r
+                           , pops  = pops  m >> pop_V r }
+  return r
 
-new :: Manager s -> ST s (STRef s (Stack s a))
-new m = newSTRef (emptyStack m)
+-- | Set value at top of stack
+set :: STRef s [a] -> a -> ST s ()
+set r a = do
+  modifySTRef r $ \(_:as) -> a:as
 
-push :: STRef s (Stack s a) -> a -> ST s ()
-push r a = do
-  s <- readSTRef r
-  writeSTRef r s { unStack = a:(unStack s) }
-  let rm = manager s
-  modifySTRef rm $ \m -> m >> pop r >> return ()
-
-pop :: STRef s (Stack s a) -> ST s a
-pop r = do
-  Stack (a:as) _ <- readSTRef r
-  modifySTRef r $ \s -> s { unStack = as }
+-- | Get value at top of stack
+get :: STRef s [a] -> ST s a
+get r = do
+  (a:_) <- readSTRef r
   return a
 
-rewind :: Manager s -> ST s ()
-rewind rm = do
-  m <- readSTRef rm
-  m
+-- | Duplicate value at top of stack
+pushV :: STRef s [a] -> ST s ()
+pushV r = do
+  modifySTRef r $ \as@(a:_) -> a:as
 
-testStack :: ([Int], [Bool])
+-- | Remove value at top of stack
+pop_V :: STRef s [a] -> ST s ()
+pop_V r = do
+  modifySTRef r $ \(_:as) -> as
+
+-- | Push stacks in the manager
+push :: STRef s (Manager s) -> ST s ()
+push rm = do
+  m <- readSTRef rm
+  pushs m
+
+-- | Pop stacks in the manager
+pop :: STRef s (Manager s) -> ST s ()
+pop rm = do
+  m <- readSTRef rm
+  pops m
+
+testStack :: (([Int], [Bool]), (Int, Bool), ([Int], [Bool]), (Int, Bool))
 testStack = runST $ do
+  -- setup manager
   m <- newManager
-  i <- new m
-  b <- new m
-  push i 123
-  push b True
-  push i 456
-  push b False
-  rewind m
-  Stack asi _ <- readSTRef i
-  Stack asb _ <- readSTRef b
-  return (asi, asb)
+  let newm = new m
+
+  -- create stacks
+  i <- newm 123
+  b <- newm True
+
+  -- push stacks
+  push m
+  set i 456
+  set b False
+  si <- readSTRef i
+  sb <- readSTRef b
+  vi <- get i
+  vb <- get b
+
+  -- pop stacks
+  pop m
+  si' <- readSTRef i
+  sb' <- readSTRef b
+  vi' <- get i
+  vb' <- get b
+
+  -- unsafe pop
+--   pop m -- pop to empty
+--   si'' <- readSTRef i
+--   pop m -- pop from empty
+--   si''' <- get i
+
+  return ((si, sb), (vi, vb), (si', sb'), (vi', vb'))
