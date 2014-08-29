@@ -88,7 +88,7 @@ runFD :: (forall s. FD s a) -> a
 runFD = runST
 
 -- | Constraint for domain value
-type FDDomain v = (Ord v, Enum v, Show v)
+type FDDomain v = (Ord v, Show v)
 
 -- | Domain of variables.
 type Domain = Set
