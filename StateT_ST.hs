@@ -17,22 +17,29 @@ import Data.STRef (readSTRef)
 
 type StateST s s' = StateT (STRef s s') (ST s)
 
+{-|
+>>> test
+124
+-}
 test :: Int
 test = runST $ flip evalStateT undefined $ do
   ginit 123
   gpp
   gget
 
+-- | Create global variable
 ginit :: Int -> StateST s Int ()
 ginit i = do
   vi <- lift $ newSTRef i
   put vi
 
+-- | Increment value of global variable
 gpp :: StateST s Int ()
 gpp = do
   vi <- get
   lift $ modifySTRef vi (+1)
 
+-- | Get from global variable
 gget :: StateST s Int Int
 gget = do
   vi <- get
