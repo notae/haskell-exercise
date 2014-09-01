@@ -116,8 +116,8 @@ class PackMap p where
   fromPack :: (forall a. t a -> t') -> p t -> [t']
 
 class PackLift p p' where
-  pup :: (forall a. a -> [a]) -> p' -> p []
-  pdown :: (forall a. [a] -> a) -> p [] -> p'
+  pup :: (forall a. a -> t a) -> p' -> p t
+  pdown :: (forall a. t a -> a) -> p t -> p'
 
 class (PackMap p, PackLift p p') => Pack p p'
 
