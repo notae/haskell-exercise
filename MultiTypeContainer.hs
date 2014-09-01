@@ -1,6 +1,7 @@
 -- Example of Container for Multiple Types
 
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module MultiTypeContainer where
 
@@ -80,8 +81,9 @@ testListCCmapM = cmapM (map Just) listc
 
 -- containing container
 
-newtype PairList x y t = PairList { unPairList :: [(t x, t y)] }
-                       deriving (Show, Eq)
+newtype PairList x y t =
+  PairList { unPairList :: [(t x, t y)] }
+  deriving (Show, Eq)
 
 instance (Enum x, Ord x, Enum y, Ord y) =>
          Container (PairList x y) where
@@ -101,3 +103,64 @@ testPairListCmapA = cmapA (map Just) pairList
 
 testPairListCmapM :: [PairList Integer Bool Maybe]
 testPairListCmapM = cmapM (map Just) pairList
+
+---
+--- Another experiment
+---
+
+class PackMap p where
+  pmap :: (forall a. t a -> t' a) -> p t -> p t'
+  pmapA :: Applicative f => (forall a. t a -> f (t' a)) -> p t -> f (p t')
+  pmapM :: Monad m => (forall a. t a -> m (t' a)) -> p t -> m (p t')
+  pmapM f = unwrapMonad . pmapA (WrapMonad . f)
+  fromPack :: (forall a. t a -> t') -> p t -> [t']
+
+class PackLift p p' where
+  pup :: (forall a. a -> [a]) -> p' -> p []
+  pdown :: (forall a. [a] -> a) -> p [] -> p'
+
+class (PackMap p, PackLift p p') => Pack p p'
+
+newtype PL x y = PL [(x, y)] deriving (Show, Eq)
+newtype PPL x y t = PPL (PL (t x) (t y)) deriving (Show, Eq)
+
+instance PackMap (PPL x y) where
+  pmap f (PPL (PL ps)) = PPL $ PL $ fmap (\(x, y) -> (f x, f y)) ps
+  pmapA f (PPL (PL ps)) =
+    PPL <$> PL <$> traverse (\(tx, ty) -> (,) <$> f tx <*> f ty) ps
+  fromPack f (PPL (PL ps)) = concatMap (\(x, y) -> [f x, f y]) ps
+
+instance PackLift (PPL x y) (PL x y) where
+  pup f (PL ps) = PPL $ PL $ fmap (\(x, y) -> (f x, f y)) ps
+  pdown f (PPL (PL ps)) = PL $ fmap (\(x, y) -> (f x, f y)) ps
+
+instance Pack (PPL x y) (PL x y)
+
+pl :: PPL Int Bool []
+pl = PPL $ PL [ ([1..3], [True, False])
+              , ([4..5], [True, False]) ]
+
+pl' :: PL Int Bool
+pl' = PL [ (1, True)
+         , (4, False) ]
+
+{-|
+>>> testPL
+PL [(1,True),(4,True)]
+-}
+testPL :: PL Int Bool
+testPL = pdown head pl
+
+{-|
+>>> testPL2
+[3,2,2,2]
+-}
+testPL2 :: [Int]
+testPL2 = fromPack length pl
+
+{-|
+>>> testPL'
+PPL (PL [([1],[True]),([4],[False])])
+-}
+testPL' :: PPL Int Bool []
+testPL' = pup (:[])  pl'
