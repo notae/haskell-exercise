@@ -64,3 +64,10 @@ Bar {barInt = 123, barBool = True}
 -}
 test7 :: Bar
 test7 = read "Bar {barInt = 123, barBool = True}"
+
+{-|
+>>> test7'
+*** Exception: Prelude.read: no parse
+-}
+test7' :: Bar
+test7' = read "Bar 123 True"
