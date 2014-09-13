@@ -71,3 +71,11 @@ test7 = read "Bar {barInt = 123, barBool = True}"
 -}
 test7' :: Bar
 test7' = read "Bar 123 True"
+
+data Color = Red | Green | Blue | Any deriving (Show, Read, Eq, Ord)
+
+testAny :: [Color]
+testAny = read "[Red, Green, Blue, Any]"
+
+testAny2 :: [Set Color]
+testAny2 = read "[fromList [Red, Green, Blue], fromList [Any]]"
