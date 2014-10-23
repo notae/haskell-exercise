@@ -44,6 +44,12 @@ testState n = flip runState 0 $ do
     return s
   return a
 
+{-|
+>>> head $ testST2 1
+*1
+*2
+1
+-}
 testST2 :: Int -> [Int]
 testST2 _ = runST $ do
   v <- newSTRef 0
@@ -55,6 +61,10 @@ testST2 _ = runST $ do
   a2 <- readSTRef v
   return [a1, a2]
 
+{-|
+>>> head $ fst $ testState2 1
+1
+-}
 testState2 :: Int -> ([Int], Int)
 testState2 _ = flip runState 0 $ do
   traceM "*1"
@@ -65,6 +75,12 @@ testState2 _ = flip runState 0 $ do
   a2 <- get
   return [a1, a2]
 
+{-|
+>>> head $ testMaybe2 1
+*1
+*2
+1
+-}
 testMaybe2 :: Int -> [Int]
 testMaybe2 _ = maybe [] id $ do
   traceM "*1"
