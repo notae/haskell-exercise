@@ -70,7 +70,7 @@ msg "Setup ghc-mod, hlint ..."
 ${MKDIR} ${SANDBOX_DIR}
 pushd ${SANDBOX_DIR}
 ${CABAL_USR} sandbox init
-${CABAL_USR} install -j ghc-mod hlint doctest
+${CABAL_USR} install -j ghc-mod hlint doctest ipprint
 popd
 
 msg "${TITLE} was completed."
