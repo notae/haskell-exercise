@@ -62,3 +62,14 @@ cs2 = [r', g', b', d', d2']
 -}
 noDefault' :: [C] -> [Color]
 noDefault' = map cToColor
+
+--- more generic
+
+class HasDefault a where
+  defaultValue :: a
+
+instance HasDefault Color where
+  defaultValue = Green
+
+resolve :: HasDefault a => Maybe a -> a
+resolve = fromMaybe defaultValue
