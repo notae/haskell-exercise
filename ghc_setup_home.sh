@@ -28,6 +28,7 @@ readonly MKDIR=/bin/mkdir
 
 readonly CABAL_SYS=/usr/bin/cabal
 readonly CABAL_USR="${HOME}/Library/Haskell/bin/cabal"
+readonly CABALG="${HOME}/Library/Haskell/bin/cabalg"
 readonly USR_BIN_DIR="${HOME}/Library/Haskell/bin"
 readonly DEST_DIRS="${HOME}/.ghc ${HOME}/.cabal ${HOME}/Library/Haskell"
 readonly SANDBOX_DIR="${HOME}/Library/Haskell/tools"
@@ -63,14 +64,20 @@ ${RM} -rf ${DEST_DIRS}
 
 msg "Setup new Cabal / cabal-install ..."
 ${CABAL_SYS} update
-${CABAL_SYS} install -j cabal-install
+${CABAL_SYS} install -j Cabal cabal-install
 ${CABAL_USR} update
 
-msg "Setup ghc-mod, hlint ..."
+msg "Setup utility tools in user directory : cabalg ..."
+${CABAL_USR} install -j cabalg
+
+msg "Setup utility library in user directory : ipprint-lite ..."
+${CABALG} install https://github.com/notae/ipprint.git
+
+msg "Setup utility tools in sandbox : ghc-mod, hlint ..."
 ${MKDIR} ${SANDBOX_DIR}
 pushd ${SANDBOX_DIR}
 ${CABAL_USR} sandbox init
-${CABAL_USR} install -j ghc-mod hlint doctest ipprint
+${CABAL_USR} install -j ghc-mod hlint doctest
 popd
 
 msg "${TITLE} was completed."
