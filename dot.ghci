@@ -1,0 +1,24 @@
+:set prompt  "[%s]\n\ESC[31m> \ESC[m"
+:set prompt2 "\ESC[31m>|\ESC[m"
+-- :set prompt  "[%s]\nλ "
+-- :set prompt2 "λ|"
+-- :set prompt  "[%s]\n> "
+-- :set prompt2 ">|"
+
+:set +t
+
+let ghciEscapeShellArg arg = "'" ++ concatMap (\c -> if c == '\'' then "'\"'\"'" else [c]) arg ++ "'"
+:def! search return . (":! hoogle --color " ++) . ghciEscapeShellArg
+:def! doc return . (":! hoogle --info " ++) . ghciEscapeShellArg
+
+import qualified IPPrint.Lite as IPPrint
+import qualified Language.Haskell.HsColour as HsColour
+import qualified Language.Haskell.HsColour.Colourise as HsColour
+import qualified Language.Haskell.HsColour.Output as HsColour
+
+:def! initPrint \x -> return $ unlines ["let myColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Green], HsColour.conop = [HsColour.Foreground HsColour.Green], HsColour.string = [HsColour.Foreground HsColour.Magenta], HsColour.char = [HsColour.Foreground HsColour.Magenta], HsColour.number = [HsColour.Foreground HsColour.Blue], HsColour.layout = [HsColour.Foreground HsColour.Black], HsColour.keyglyph = [HsColour.Foreground HsColour.Black] }", "let myPrint = putStrLn . HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) myColourPrefs False False \"\" False . IPPrint.pshow", ":set -interactive-print=myPrint"]
+
+:initPrint
+
+:def! l \x -> return $ unlines [unwords [":load", x], ":initPrint"]
+:def! r \_ -> return $ unlines [":reload", ":initPrint"]
