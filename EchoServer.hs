@@ -2,11 +2,11 @@
 
 module EchoServer where
 
-import           Control.Applicative ((<$>))
-import           Control.Concurrent
-import           Control.Exception
-import           Network.Socket
-import           System.IO
+import Control.Applicative ((<$>))
+import Control.Concurrent
+import Control.Exception
+import Network.Socket
+import System.IO
 
 echoServer :: ServiceName -> IO ()
 echoServer port = withSocketsDo $ do
