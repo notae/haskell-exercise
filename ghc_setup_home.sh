@@ -77,7 +77,7 @@ msg "Setup utility tools in sandbox : ghc-mod, hlint ..."
 ${MKDIR} ${SANDBOX_DIR}
 pushd ${SANDBOX_DIR}
 ${CABAL_USR} sandbox init
-${CABAL_USR} install -j ghc-mod hlint doctest
+${CABAL_USR} install -j ghc-mod hlint doctest stylish-haskell hi
 popd
 
 msg "${TITLE} was completed."
