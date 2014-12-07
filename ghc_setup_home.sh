@@ -71,13 +71,13 @@ msg "Setup utility tools in user directory : cabalg ..."
 ${CABAL_USR} install -j cabalg
 
 msg "Setup utility library in user directory : ipprint-lite ..."
-${CABALG} install https://github.com/notae/ipprint.git
+${CABALG} https://github.com/notae/ipprint.git
 
-msg "Setup utility tools in sandbox : ghc-mod, hlint ..."
+msg "Setup utility tools in sandbox : ghc-mod, hlint, etc."
 ${MKDIR} ${SANDBOX_DIR}
 pushd ${SANDBOX_DIR}
 ${CABAL_USR} sandbox init
-${CABAL_USR} install -j ghc-mod hlint doctest stylish-haskell hi
+${CABAL_USR} install -j ghc-mod hlint doctest stylish-haskell hi present pandoc
 popd
 
 msg "${TITLE} was completed."
