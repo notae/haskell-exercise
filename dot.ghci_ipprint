@@ -1,0 +1,37 @@
+-- IPPrint in GHCi scripts
+
+:{
+let skipBoring :: IPPrint.ReadPrec ()
+    skipBoring =
+      do { IPPrint.Ident "value" <- IPPrint.lexP; IPPrint.Punc  "=" <- IPPrint.lexP; return () } IPPrint.<++
+      do { _ <- IPPrint.lexP; skipBoring }
+:}
+:{
+let pshowWidth :: Show a => Int -> a -> String
+    pshowWidth width v =
+      case IPPrint.parseModule ("value = "++s) of
+        IPPrint.ParseOk         m -> tidy $ IPPrint.prettyPrintStyleMode (IPPrint.Style IPPrint.PageMode width 1.1) IPPrint.defaultMode m
+        IPPrint.ParseFailed _ _   -> s
+      where
+        s = show v
+        tidy x =
+          case IPPrint.readPrec_to_S skipBoring 0 x of
+            [((), tail')] -> "   " ++ tail'
+            _             -> s
+:}
+:{
+let myColourPrefs =
+      IPHsColour.defaultColourPrefs
+      { IPHsColour.conid    = [IPHsColour.Foreground IPHsColour.Green]
+      , IPHsColour.conop    = [IPHsColour.Foreground IPHsColour.Green]
+      , IPHsColour.string   = [IPHsColour.Foreground IPHsColour.Magenta]
+      , IPHsColour.char     = [IPHsColour.Foreground IPHsColour.Magenta]
+      , IPHsColour.number   = [IPHsColour.Foreground IPHsColour.Blue]
+      , IPHsColour.layout   = [IPHsColour.Foreground IPHsColour.Black]
+      , IPHsColour.keyglyph = [IPHsColour.Foreground IPHsColour.Black] }
+:}
+:{
+let myPrint = putStrLn . IPHsColour.hscolour (IPHsColour.TTYg IPHsColour.XTerm256Compatible) myColourPrefs False False "" False . (pshowWidth 80)
+:}
+
+:seti -interactive-print=myPrint
