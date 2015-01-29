@@ -1,32 +1,34 @@
 -- Example of Multiple Type Binding
 
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
-import Control.Applicative (Alternative)
-import Control.Applicative (Applicative)
-import Control.Monad (MonadPlus)
-import Control.Monad.ST (ST)
-import Control.Monad.ST (runST)
-import Control.Monad.State (MonadState)
-import Control.Monad.State (StateT)
-import Control.Monad.State (evalStateT)
-import Control.Monad.State (gets)
-import Control.Monad.State (modify)
-import Control.Monad.State (runStateT)
-import Data.Functor.Identity (runIdentity)
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import Data.STRef (STRef)
-import Data.STRef (newSTRef)
-import Data.STRef (readSTRef)
-import Data.STRef (writeSTRef)
-import Control.Monad.Trans (lift)
+module MultiTypeBinding where
+
+import           Control.Applicative   (Alternative)
+import           Control.Applicative   (Applicative)
+import           Control.Monad         (MonadPlus)
+import           Control.Monad.ST      (ST)
+import           Control.Monad.ST      (runST)
+import           Control.Monad.State   (MonadState)
+import           Control.Monad.State   (StateT)
+import           Control.Monad.State   (evalStateT)
+import           Control.Monad.State   (gets)
+import           Control.Monad.State   (modify)
+import           Control.Monad.State   (runStateT)
+import           Control.Monad.Trans   (lift)
+import           Data.Functor.Identity (runIdentity)
+import           Data.IntMap           (IntMap)
+import qualified Data.IntMap           as IntMap
+import           Data.STRef            (STRef)
+import           Data.STRef            (newSTRef)
+import           Data.STRef            (readSTRef)
+import           Data.STRef            (writeSTRef)
 
 -- Interface for variable binding
 
