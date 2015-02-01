@@ -12,6 +12,8 @@ view D{..} = (dFirst, dSecond)
 f :: D -> Int
 f (view -> (i, True)) = i * 2
 f (view -> (i, False)) = i
+-- f (view -> (i, _)) = i
+-- f (view -> _) = undefined
 
 -- no warning
 g :: (Int, Bool) -> Int
