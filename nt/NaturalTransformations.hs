@@ -21,23 +21,31 @@ pmapF f = fmap (runNT f)
 class Pack p where
   pmap :: NT f g -> p f -> p g
 
--- example data type
-data Pair_ a b = Pair_ (a, b) deriving (Show, Eq)
-type Pair = Pair_ Int Bool
-newtype Pair' f = Pair' (Pair_ (f Int) (f Bool))
-deriving instance (Show (f Int), Show (f Bool)) => Show (Pair' f)
-instance Pack Pair' where
-  pmap nt (Pair' (Pair_ (i, b))) = Pair' (Pair_ (i', b')) where
+-- Example data types
+-- with multiple parameterized types
+data P_ a b = P_ (a, b) deriving (Show, Eq)
+-- for normal use
+type P = P_ Int Bool
+-- with context
+newtype P' f = P' (P_ (f Int) (f Bool))
+deriving instance (Show (f Int), Show (f Bool)) => Show (P' f)
+-- for traverse over multiple parameterized types
+instance Pack P' where
+  pmap nt (P' (P_ (i, b))) = P' (P_ (i', b')) where
     i' = (runNT nt) i
     b' = (runNT nt) b
 
-testB :: Pair
-testB = Pair_ (1, True)
-testI :: Pair' Identity
-testI = Pair' (Pair_ (Identity 1, Identity True))
+testB :: P
+testB = P_ (1, True)
+testI :: P' Identity
+testI = P' (P_ (Identity 1, Identity True))
 ntJust :: NT Identity Maybe
 ntJust = NT (Just . runIdentity)
 pmapJust :: Pack p => p Identity -> p Maybe
 pmapJust = pmap ntJust
-test :: Pair' Maybe
+test :: P' Maybe
 test = pmapJust testI
+
+{-
+with type family
+-}
