@@ -2,12 +2,17 @@
 
 {-# LANGUAGE DeriveFunctor        #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module NaturalTransformations where
 
+import Control.Applicative
+import Control.Monad
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Text.Show.Functions   ()
@@ -46,6 +51,19 @@ pmapJust = pmap ntJust
 test :: P' Maybe
 test = pmapJust testI
 
-{-
-with type family
--}
+-- with type family
+-- map base type to lifted type
+type family L p :: (* -> *) -> *
+class PackLift p where
+  pup   :: Applicative f => p     -> L p f
+  pdown :: Applicative f => L p f -> p
+
+type instance L P = P'
+instance PackLift P where
+  pup (P_ (i, b)) = P' $ P_ (pure i, pure b)
+
+-- with type family (another pattern)
+type family L' p f :: *
+
+-- type error
+-- type instance L' P f = P' f
