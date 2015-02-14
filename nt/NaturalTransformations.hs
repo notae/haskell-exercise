@@ -55,12 +55,22 @@ test = pmapJust testI
 -- map base type to lifted type
 type family L p :: (* -> *) -> *
 class PackLift p where
-  pup   :: Applicative f => p     -> L p f
-  pdown :: Applicative f => L p f -> p
+  pup   :: Applicative f =>                         p     -> L p f
+  pup = pup' pure
+  pup'  :: Applicative f => (forall a. a -> f a) -> p     -> L p f
+  pdown :: Applicative f => (forall a. f a -> a) -> L p f -> p
 
 type instance L P = P'
 instance PackLift P where
-  pup (P_ (i, b)) = P' $ P_ (pure i, pure b)
+  pup' f (P_ (i, b)) = P' $ P_ (f i, f b)
+  pdown f (P' (P_ (i, b))) = P_ (f i, f b)
+
+{-|
+>>> testPup
+P' (P_ (Just 1, Just True))
+-}
+testPup :: L P Maybe
+testPup = pup testB
 
 -- with type family (another pattern)
 type family L' p f :: *
