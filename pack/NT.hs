@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module NaturalTransformations where
+module NT where
 
 import Control.Applicative
 import Control.Category      as Category
