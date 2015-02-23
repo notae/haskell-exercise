@@ -1,7 +1,7 @@
 -- Example of representaiton of default values
 
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 
 module Default where
 
@@ -73,3 +73,11 @@ instance HasDefault Color where
 
 resolve :: HasDefault a => Maybe a -> a
 resolve = fromMaybe defaultValue
+
+--- another
+
+data Default a = Default | Value a deriving (Read, Show, Eq, Ord)
+
+resolve' :: HasDefault a => Default a -> a
+resolve' Default   = defaultValue
+resolve' (Value a) = a
