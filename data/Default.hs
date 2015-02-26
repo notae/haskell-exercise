@@ -63,7 +63,7 @@ cs2 = [r', g', b', d', d2']
 noDefault' :: [C] -> [Color]
 noDefault' = map cToColor
 
---- more generic
+--- with type class for general data
 
 class HasDefault a where
   defaultValue :: a
@@ -71,13 +71,22 @@ class HasDefault a where
 instance HasDefault Color where
   defaultValue = Green
 
+-- with Maybe
+
 resolve :: HasDefault a => Maybe a -> a
 resolve = fromMaybe defaultValue
 
---- another
+--- with sum type
 
 data Default a = Default | Value a deriving (Read, Show, Eq, Ord)
 
 resolve' :: HasDefault a => Default a -> a
 resolve' Default   = defaultValue
 resolve' (Value a) = a
+
+-- with default value in short symbol
+
+_' :: Color
+_' = defaultValue
+cs3 :: [Color]
+cs3 = [Red, Green, Blue, _']
