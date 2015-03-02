@@ -1,6 +1,7 @@
 -- Example of representaiton of default values
 
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 
 module Default where
@@ -86,7 +87,14 @@ resolve' (Value a) = a
 
 -- with default value in short symbol
 
-_' :: Color
+_' :: HasDefault a => a
 _' = defaultValue
 cs3 :: [Color]
 cs3 = [Red, Green, Blue, _']
+
+-- for list type
+
+instance HasDefault [Color] where
+  defaultValue = [Red, Blue]
+cs4 :: [[Color]]
+cs4 = [[Red], [Blue, Green], [], _']
