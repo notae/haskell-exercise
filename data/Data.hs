@@ -16,17 +16,29 @@ data X =
 x :: X
 x = X 123 'a'
 
+{-|
+>>> gmapT incr x
+X {foo = 124, bar = 'a'}
+-}
 incr :: forall d. Data d => d -> d
 incr d = case cast d of
           Nothing          -> d
           Just (i :: Int)  -> fromJust (cast (i + 1))
 
 {-|
->>> test
-X {foo = 124, bar = 'a'}
+>>> gmapT incr y
+Y {baz = True, qux = 457, yx = X {foo = 123, bar = 'a'}}
 -}
-test :: X
-test = gmapT incr x
+
+{-|
+>>> gmapT (gmapT incr) y
+Y {baz = True, qux = 456, yx = X {foo = 124, bar = 'a'}}
+-}
+
+{-|
+>>> gmapT (gmapT incr) (gmapT incr y)
+Y {baz = True, qux = 457, yx = X {foo = 124, bar = 'a'}}
+-}
 
 data Y =
   Y
@@ -39,44 +51,28 @@ y :: Y
 y = Y True 456 x
 
 {-|
->>> test2
-Y {baz = True, qux = 457, yx = X {foo = 123, bar = 'a'}}
--}
-test2 :: Y
-test2 = gmapT incr y
-
-{-|
->>> test3
-Y {baz = True, qux = 456, yx = X {foo = 124, bar = 'a'}}
--}
-test3 :: Y
-test3 = gmapT (gmapT incr) y
-
-{-|
->>> test4
+>>> gmapT incr' y
 Y {baz = True, qux = 457, yx = X {foo = 124, bar = 'a'}}
 -}
-test4 :: Y
-test4 = gmapT (gmapT incr) (gmapT incr y)
-
 incr' :: forall d. Data d => d -> d
 incr' d = case cast d of
            Nothing          -> gmapT incr' d
            Just (i :: Int)  -> fromJust (cast (i + 1))
 
 {-|
->>> test5
+>>> gmapT' incr y
 Y {baz = True, qux = 457, yx = X {foo = 124, bar = 'a'}}
+>>> gmapT' incr [1::Int,2,3]
+[2,3,4]
 -}
-test5 :: Y
-test5 = gmapT incr' y
-
 gmapT' :: Data a => (forall b. Data b => b -> b) -> a -> a
-gmapT' f = gmapT (f . gmapT f)
+gmapT' f = f . gmapT (gmapT' f)
 
 {-|
->>> test6
+>>> gmapT'' incr y
 Y {baz = True, qux = 457, yx = X {foo = 124, bar = 'a'}}
+>>> gmapT'' incr [1::Int,2,3]
+[2,3,4]
 -}
-test6 :: Y
-test6 = gmapT' incr y
+gmapT'' :: Data a => (forall b. Data b => b -> b) -> a -> a
+gmapT'' f = gmapT (gmapT' f) . f
