@@ -38,7 +38,19 @@ fn (Just n) = n
 fn Nothing  = -1
 
 -- unidirectional pattern
-pattern Head x <- x:xs
+pattern Head x <- x:_
 head' :: [a] -> Maybe a
 head' (Head x) = Just x
-head' _        = Nothing
+head' []        = Nothing
+-- to avoid the warning
+-- head' _        = Nothing
+
+initLast :: [t] -> Maybe ([t], t)
+initLast [] = Nothing
+initLast xs = Just (init xs, last xs)
+pattern xs ::: x <- (initLast -> Just (xs,x))
+il :: [a] -> Maybe a
+il [] = Nothing
+il (_ ::: x) = Just x
+-- to avoid the warning
+-- il _ = Nothing
