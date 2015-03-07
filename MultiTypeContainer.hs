@@ -1,7 +1,8 @@
 -- Example of Container for Multiple Types
 
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module MultiTypeContainer where
 
@@ -9,8 +10,8 @@ import Control.Applicative (Applicative)
 import Control.Applicative ((<$>))
 import Control.Applicative ((<*>))
 import Control.Applicative (WrappedMonad (..))
-import Data.Maybe (listToMaybe)
-import Data.Traversable (traverse)
+import Data.Maybe          (listToMaybe)
+import Data.Traversable    (traverse)
 
 class Container c where
   cmap :: (forall a. t a -> t' a) -> c t -> c t'
@@ -164,3 +165,50 @@ PPL (PL [([1],[True]),([4],[False])])
 -}
 testPL' :: PPL Int Bool []
 testPL' = pup (:[])  pl'
+
+-- Another experiment
+{-
+(a, b)
+(Maybe a, Maybe b)
+([a], [b])
+-}
+
+class CL c where
+  type L c :: (* -> *) -> *
+  liftUp :: (forall a. a -> t a) -> c -> L c t
+  liftDown :: (forall a. t a -> a) -> L c t -> c
+  cmap' :: (forall a. t a -> t' a) -> L c t -> L c t'
+
+class CM c where
+--   type L c :: (* -> *) -> *
+--   data L c :: (* -> *) -> *
+--   cmap' :: (forall a. t a -> t' a) -> L c t -> L c t'
+
+data P a b = P a b deriving (Show, Eq)
+-- data P_ a b t = P_ (t a) (t b) deriving (Show, Eq)
+newtype P_ a b t = P_ (P (t a) (t b)) deriving (Show, Eq)
+
+instance CL (P a b) where
+  type L (P a b) = P_ a b
+  liftUp f (P a b) = P_ (P (f a) (f b))
+  liftDown f (P_ (P a b)) = P (f a) (f b)
+--   data L (P a b) t = P_ (t a) (t b) deriving (Show, Eq)
+--   liftUp f (P a b) = P_ (f a) (f b)
+--   liftDown f (P_ a b) = P (f a) (f b)
+  cmap' f (P_ (P a b)) = P_ (P (f a) (f b))
+
+{-|
+>>> liftUp Just (P 123 True)
+P_ (P (Just 123) (Just True))
+>>> liftDown (maybe undefined id) (liftUp Just (P 123 True)) :: P Int Bool
+P 123 True
+>>> liftDown head (liftUp (:[]) (P 123 True)) :: P Int Bool
+P 123 True
+>>> cmap' listToMaybe (liftUp (:[]) (P 123 True))
+P'' (Just 123) (Just True)
+-}
+
+{-
+(a, b)    -> (t a, t b)
+c         -> L c t
+-}
