@@ -18,6 +18,8 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Fop12_1
                      , Fop12_2
+                     , Fop12_2ex
+                     , Fop12_3
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
