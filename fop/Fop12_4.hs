@@ -21,7 +21,7 @@ type Name   = String
 type Age    = Int
 data Person = Person Name Age deriving (Show)
 
-ps :: [Person]
+ps ∷ [Person]
 ps = [Person "Norma" 50, Person "Richard" 59]
 
 tick ∷ Name → Traversal
@@ -38,7 +38,7 @@ type Traversal = ∀τ. Type τ → τ → τ
 copy ∷ Traversal
 copy _ = id
 
-(∘) :: Traversal → Traversal → Traversal
+(∘) ∷ Traversal → Traversal → Traversal
 (f ∘ g) rt = f rt . g rt
 
 imap ∷ Traversal → Traversal
