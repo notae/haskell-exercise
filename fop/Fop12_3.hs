@@ -4,7 +4,8 @@
 
 module Fop12_3 where
 
-import Control.Monad (liftM, liftM2)
+import Control.Monad    (liftM, liftM2)
+import Text.PrettyPrint
 
 data Type t where
   RDyn ∷ Type Dynamic
@@ -27,19 +28,22 @@ instance Show (Type t) where
 
 data Dynamic = ∀ τ. Dyn (Type τ) τ
 
--- show only type for debug
 instance Show Dynamic where
-  show (Dyn ra _) = show ra
+  show = render . pretty RDyn
 
 {-|
 >>> :type ds
 ds :: [Dynamic]
 >>> ds
-[Int,String]
+[Dynamic Int 60,Dynamic String "Bird"]
 -}
 ds :: [Dynamic]
 ds = [Dyn RInt 60, Dyn rString "Bird"]
 
+{-|
+>>> dds
+Dynamic [Dynamic] [Dynamic Int 60,Dynamic String "Bird"]
+-}
 dds :: Dynamic
 dds = Dyn (RList RDyn) ds
 
@@ -63,3 +67,25 @@ Just (123,"foo")
 -}
 cast ∷ ∀τ. Dynamic → Type τ → Maybe τ
 cast (Dyn ra a) rt = fmap (\f → f a) (teq ra rt)
+
+pretty ∷ Type t → t → Doc
+pretty (RDyn) (Dyn ra a)    = text "Dynamic" <> space <> text (show ra) <> space <> pretty ra a
+pretty (RInt) i             = prettyInt i
+pretty (RChar) c            = prettyChar c
+pretty (RList RChar) s      = prettyString s
+pretty (RList _) []         = lbrack <> rbrack
+pretty (RList ra) (a:as)    = block 1 (lbrack <> pretty ra a <> prettyL as)
+  where prettyL []          = rbrack
+        prettyL (a:as)      = comma <> pretty ra a <> prettyL as
+pretty (RPair ra rb) (a, b) = block 1 (lparen <> pretty ra a <> comma <>
+                                       pretty rb b <> rparen)
+
+block ∷ Int → Doc → Doc
+block i d = nest i d
+
+prettyInt :: Int -> Doc
+prettyInt    = int
+prettyChar :: Char -> Doc
+prettyChar   = char
+prettyString :: String -> Doc
+prettyString = doubleQuotes . text

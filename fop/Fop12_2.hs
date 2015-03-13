@@ -4,7 +4,6 @@
 
 module Fop12_2 where
 
--- import qualified Text.PrettyPrint as PP
 import Text.PrettyPrint
 
 --
@@ -23,7 +22,7 @@ deriving instance Show (Type t)
 >>> RPair RInt (RList RChar)
 RPair RInt (RList RChar)
 >>> :t RPair RInt (RList RChar)
-RPair RInt (RList RChar) ∷ Type (Int, [Char])
+RPair RInt (RList RChar) :: Type (Int, [Char])
 -}
 
 rString ∷ Type String
@@ -33,7 +32,7 @@ rString = RList RChar
 >>> RPair RInt rString
 RPair RInt (RList RChar)
 >>> :t RPair RInt rString
-RPair RInt rString ∷ Type (Int, String)
+RPair RInt rString :: Type (Int, String)
 -}
 
 --
@@ -79,6 +78,6 @@ pretty (RPair ra rb) (a, b) = block 1 (lparen <> pretty ra a <> comma <>
 block ∷ Int → Doc → Doc
 block i d = nest i d
 
-prettyInt i    = int i
-prettyChar c   = char c
-prettyString s = text s
+prettyInt    = int
+prettyChar   = char
+prettyString = doubleQuotes . text
