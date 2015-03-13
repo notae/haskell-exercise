@@ -37,14 +37,14 @@ ds :: [Dynamic]
 >>> ds
 [Dynamic Int 60,Dynamic String "Bird"]
 -}
-ds :: [Dynamic]
+ds ∷ [Dynamic]
 ds = [Dyn RInt 60, Dyn rString "Bird"]
 
 {-|
 >>> dds
 Dynamic [Dynamic] [Dynamic Int 60,Dynamic String "Bird"]
 -}
-dds :: Dynamic
+dds ∷ Dynamic
 dds = Dyn (RList RDyn) ds
 
 teq ∷ ∀τ σ . Type τ → Type σ → Maybe (τ → σ)
@@ -83,9 +83,9 @@ pretty (RPair ra rb) (a, b) = block 1 (lparen <> pretty ra a <> comma <>
 block ∷ Int → Doc → Doc
 block i d = nest i d
 
-prettyInt :: Int -> Doc
+prettyInt ∷ Int → Doc
 prettyInt    = int
-prettyChar :: Char -> Doc
+prettyChar ∷ Char → Doc
 prettyChar   = char
-prettyString :: String -> Doc
+prettyString ∷ String → Doc
 prettyString = doubleQuotes . text
