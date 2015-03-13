@@ -19,6 +19,7 @@ library
   exposed-modules:     Fop12_1
                      , Fop12_2
                      , Fop12_3
+                     , Fop12_4
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
