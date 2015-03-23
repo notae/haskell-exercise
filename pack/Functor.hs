@@ -59,8 +59,6 @@ newtype PointXY a = PointXY (Point a a) deriving (Show, Eq)
 newtype PointX y x = PointX (Point x y) deriving (Show, Eq)
 newtype PointY x y = PointY (Point x y) deriving (Show, Eq)
 
--- instance Show1 PointXY where showsPrec1 = showsPrec
-
 {-|
 prop> fmap id (PointXY (Point x y)) == id (PointXY (Point x y))
 prop> fmap (g . f) (PointXY (Point x y)) == ((fmap g) . (fmap f)) (PointXY (Point x y))
@@ -76,7 +74,8 @@ instance Functor (PointX y) where
 instance Functor (PointY x) where
   fmap f (PointY (Point x y)) = PointY $ Point x (f y)
 
+{-|
+>>> getCompose $ fmap (+1) $ Compose [PointXY $ Point 1 2, PointXY $ Point 3 4]
+[PointXY (Point {pointX = 2, pointY = 3}),PointXY (Point {pointX = 4, pointY = 5})]
+-}
 type PList_ x y = [Point x y]
-newtype PList x y = PList [Point x y]
-
--- deriving instance Functor (PList x)
