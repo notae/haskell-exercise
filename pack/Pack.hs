@@ -1,17 +1,19 @@
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE KindSignatures       #-}
-{-# LANGUAGE PolyKinds            #-}
-{-# LANGUAGE RankNTypes           #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE UnicodeSyntax        #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE UnicodeSyntax         #-}
 
 module Pack where
 
 import Control.Applicative
 import Control.Monad
+import Data.Functor.Compose
 import Data.Functor.Constant
 import Data.Functor.Identity
 import Data.Generics
@@ -49,6 +51,14 @@ gap :: (forall a. a -> t a) -> p -> T t p
 gap f p = undefined
 
 
+class Tr a where
+  type Co (c :: * -> *) a
+  type Co c a = c a
+--   tr :: (forall d. d -> c d) -> a -> Co c a
+  tr :: (forall d. d -> c d) -> a -> c a
+  tr f = f
+-- instance Tr Int where
+
 newtype Pair t a b = Pair (t a, b) deriving (Show, Eq)
 deriving instance Typeable Pair
 deriving instance (Typeable t, Typeable a, Typeable b, Data (t a), Data b)
@@ -77,6 +87,15 @@ con C `app` x_1                         :: c (T_2 -> ... -> T_n -> D)
 con C `app` x_1 `app` x_2               :: c (... -> T_n -> D)
 con C `app` x_1 `app` x_2 ... `app` x_n :: c D
 
+  gmapT :: (forall b. Data b => b -> b) -> a -> a
+  gmapT f x0 = unID (gfoldl k ID x0)
+    where
+      k :: Data d => ID (d->b) -> d -> ID b
+      k (ID c) x = ID (c (f x))
+
+instance Data a => Data [a] where
+  gmapT  _   []     = []
+  gmapT  f   (x:xs) = (f x:f xs)
 -}
 
 
@@ -134,3 +153,11 @@ gfoldl_ ::
     -> [a] -> c [a]
 gfoldl_ _ z []     = z []
 gfoldl_ f z (x:xs) = z (:) `f` x `f` xs
+
+
+class MMap f where
+  mmapM :: Monad m => (forall a. a -> m b) -> f a -> m (f b)
+--   mmapM :: Monad m => (a -> m b) -> f a -> m (f b)
+
+instance MMap [] where
+  mmapM f as = mapM f as
