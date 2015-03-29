@@ -29,27 +29,52 @@ type Pair_ (t :: * -> *) a b = (t a, t b)
 type PIS t = (t Int, t String)
 -- type PairI = Pair I'
 
+{-
 class Pack p where
   type F (t :: * -> *) a
   type F Identity a = a
   type F t a = t a
   type L (t :: * -> *) p
+-}
 
 type family T (t :: * -> *) a
 type instance T t (a, b) = (t a, b)
 
-type App c = forall d b. Data d => c (d -> b) -> d -> c b
-type Con c = forall g. g -> c g
 
-app :: Applicative c => App c
-app = undefined
+-- type App (c :: * -> *) = forall d b. Data d => c (d -> b) -> d -> c b
+-- type Con (c :: * -> *) = forall g. g -> c g
 
-con :: Applicative c => Con c
-con = pure
+-- type instance L t [a] = [t a]
+-- type instance L t (a, b) = (t a, t b)
+
+newtype ID x = ID { unID :: x }
+newtype CONST c a = CONST { unCONST :: c }
+
+{-
+data CTX t x = CTX { unCTX :: L t x }
+class (Data b) => Lift b where
+  type L (t :: * -> *) (p :: *)
+  liftUp :: (forall a. a -> t a) -> b -> L t b
+  liftUp f x0 = unCTX (gfoldl k z x0) where
+    k :: Data d => CTX t (d -> b) -> d -> CTX t b
+    k (CTX c) x = CTX (c (f x))
+    z :: g -> CTX t g
+    z g = CTX g
+-}
+--   liftDown :: (forall a. t a -> a) -> l -> b
+--   liftDown = undefined
+
+
+-- instance (Data a, Data (t a))
+--          => Lift [a] [t a]
+-- instance (Data a, Data b, Data (t a), Data (t b))
+--          => Lift (a, b) (t a, t b)
+
 
 gap :: (forall a. a -> t a) -> p -> T t p
 gap f p = undefined
 
+data Context t
 
 class Tr a where
   type Co (c :: * -> *) a
@@ -123,8 +148,6 @@ gmapT_ f x0 = unID (gfoldl k ID x0)
   where
     k :: Data d => ID (d->b) -> d -> ID b
     k (ID c) x = ID (c (f x))
-
-newtype ID x = ID { unID :: x }
 
 gmapT1 :: (Data (p t), Data (p t'))
        => (forall b. Data b => b -> b)
