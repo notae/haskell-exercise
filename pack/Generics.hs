@@ -9,7 +9,7 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE UnicodeSyntax         #-}
 
-module Pack where
+module Generics where
 
 import Control.Applicative
 import Control.Monad

@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     NT
-                     , Pack
+                     , Generics
                      , Functor
   -- other-modules:       
   other-extensions:    DeriveFunctor, FlexibleContexts, RankNTypes, StandaloneDeriving, UndecidableInstances
