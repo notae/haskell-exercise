@@ -20,6 +20,7 @@ library
                      , Fop12_2
                      , Fop12_3
                      , Fop12_4
+                     , Fop12_5
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
