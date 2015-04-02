@@ -21,10 +21,13 @@ library
                      , Pack
                      , Generics
                      , Functor
+                     , Unlift
   -- other-modules:       
   other-extensions:    DeriveFunctor, FlexibleContexts, RankNTypes, StandaloneDeriving, UndecidableInstances
   build-depends:       base >=4.7 && <4.8
                      , transformers >=0.3 && <0.4
                      , syb >=0.4 && <0.5
+                     , constraints >=0.4 && <0.5
+                     , monad-control >=1.0 && <1.1
   -- hs-source-dirs:      
   default-language:    Haskell2010
