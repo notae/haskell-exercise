@@ -16,7 +16,7 @@
 module Unlift where
 
 import Control.Monad.Trans.Control (MonadTransControl (liftWith), StT)
-import Control.Monad.Trans.Reader  (ReaderT)
+import Control.Monad.Trans.Reader  (ReaderT, ask, runReaderT)
 import Data.Constraint             ((:-), (\\))
 import Data.Constraint.Forall      (Forall, inst)
 
