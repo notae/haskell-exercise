@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes                 #-}
@@ -49,15 +50,17 @@ testRef l s = s ^. l > 2
 --
 
 newtype DSL a =
-  DSL { unDSL :: StateT DSLState [] a }
+  DSL { unDSL :: StateT (DSLState DSL) [] a }
   deriving (Functor, Applicative, Monad, Alternative, MonadPlus,
-            MonadState DSLState)
+            MonadState (DSLState DSL))
 
-data DSLState =
+data DSLState m =
   DSLState
-  { _exprs :: [DSL Bool]
+  { _exprs :: [m Bool]
   , _vars  :: Vars
   }
+
+type MonadDSL m = (Applicative m, MonadState (DSLState m) m)
 
 type Vars = (Int, Int, Int)
 type Var = Lens' Vars Int
@@ -68,17 +71,17 @@ runDSL :: DSL a -> [a]
 runDSL dsl = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
 
 infixr 0 $=
-($=) :: MonadState DSLState m => Var -> Int -> m ()
+($=) :: MonadDSL m => Var -> Int -> m ()
 l $= i = vars . l .= i
 
 infixl 7 $*
-($*) :: (Applicative m, MonadState DSLState m) => Var -> Var -> m Int
+($*) :: MonadDSL m => Var -> Var -> m Int
 x $* y = (*) <$> (use (vars . x)) <*> (use (vars . y))
 
-addExpr :: MonadState DSLState m => DSL Bool -> m ()
+addExpr :: MonadDSL m => m Bool -> m ()
 addExpr e = exprs %= (e:)
 
-addPred :: MonadState DSLState m => (Int -> Int -> Bool) -> Var -> Var -> m ()
+addPred :: MonadDSL m => (Int -> Int -> Bool) -> Var -> Var -> m ()
 addPred p lx ly = addExpr $ do
   x <- use (vars . lx)
   y <- use (vars . ly)
@@ -88,7 +91,7 @@ addPred p lx ly = addExpr $ do
 >>> runDSL dsl1
 [(2,3,5)]
 -}
-dsl1 :: MonadState DSLState m => m Vars
+dsl1 :: MonadDSL m => m Vars
 dsl1 = do
   _1 $= 2
   _2 $= 3
@@ -99,7 +102,7 @@ dsl1 = do
 >>> runDSL dsl2
 [6]
 -}
-dsl2 :: (Applicative m, MonadState DSLState m) => m Int
+dsl2 :: MonadDSL m => m Int
 dsl2 = do
   _1 $= 2
   _2 $= 3
@@ -115,12 +118,12 @@ pred1 x y = abs (x - y) < 2
 >>> runDSL dsl3
 [False]
 -}
-eval :: DSL Bool
+eval :: MonadDSL m => m Bool
 eval = do
   es <- use exprs
   liftM and $ sequence es
 
-dsl3 :: DSL Bool
+dsl3 :: MonadDSL m => m Bool
 dsl3 = do
   _1 $= 2
   _2 $= 3
@@ -133,10 +136,10 @@ dsl3 = do
 msAction :: Monad m => m Int
 msAction = return 1
 
-msAction2 :: MonadState DSLState m => m Int
+msAction2 :: MonadDSL m => m Int
 msAction2 = use (vars . _1)
 
-dsl4 :: MonadState DSLState m => m Int
+dsl4 :: MonadDSL m => m Int
 dsl4 = do
   msAction
   msAction2
