@@ -5,7 +5,7 @@
 
 module Lens where
 
-import Control.Applicative (Alternative, Applicative)
+import Control.Applicative (Alternative, Applicative, (<$>), (<*>))
 import Control.Lens
 import Control.Monad.State
 
@@ -55,26 +55,76 @@ newtype DSL a =
 data DSLState =
   DSLState
   { _exprs :: [DSL Bool]
-  , _var   :: Var
+  , _vars  :: Vars
   }
 
-type Var = (Int, Int, Int)
+type Vars = (Int, Int, Int)
+type Var = Lens' Vars Int
 
 makeLenses ''DSLState
 
-($=) :: Lens' Var Int -> Int -> DSL ()
-l $= i = DSL $ var . l .= i
+infixr 0 $=
+($=) :: Var -> Int -> DSL ()
+l $= i = DSL $ vars . l .= i
 
-dsl :: DSL Var
-dsl = do
+infixl 7 $*
+($*) :: Var -> Var -> DSL Int
+x $* y = (*) <$> (DSL $ use (vars . x)) <*> (DSL $ use (vars . y))
+
+addExpr :: DSL Bool -> DSL ()
+addExpr e = DSL $ exprs %= (e:)
+
+addPred :: (Int -> Int -> Bool) -> Var -> Var -> DSL ()
+addPred p lx ly = addExpr $ do
+  x <- DSL $ use (vars . lx)
+  y <- DSL $ use (vars . ly)
+  return $ p x y
+
+{-|
+>>> runDSL dsl1
+[(2,3,5)]
+-}
+dsl1 :: DSL Vars
+dsl1 = do
   _1 $= 2
   _2 $= 3
   _3 $= 5
-  DSL $ use var
+  DSL $ use vars
 
 {-|
->>> testDSL
-[(2,3,5)]
+>>> runDSL dsl2
+[6]
 -}
-testDSL :: [Var]
-testDSL = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
+dsl2 :: DSL Int
+dsl2 = do
+  _1 $= 2
+  _2 $= 3
+  _3 $= 5
+  n <- _1 $* _2
+  return n
+
+-- an user defined predicate
+pred1 :: Int -> Int -> Bool
+pred1 x y = abs (x - y) < 2
+
+{-|
+>>> runDSL dsl3
+[False]
+-}
+eval :: DSL Bool
+eval = do
+  es <- DSL $ use exprs
+  liftM and $ sequence es
+
+dsl3 :: DSL Bool
+dsl3 = do
+  _1 $= 2
+  _2 $= 3
+  _3 $= 5
+  addPred pred1 _1 _2
+  addPred pred1 _2 _3
+  -- addExpr $ (*) <$> use _1 <*> use _2
+  eval
+
+runDSL :: DSL a -> [a]
+runDSL dsl = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
