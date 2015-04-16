@@ -50,7 +50,8 @@ testRef l s = s ^. l > 2
 
 newtype DSL a =
   DSL { unDSL :: StateT DSLState [] a }
-  deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
+  deriving (Functor, Applicative, Monad, Alternative, MonadPlus,
+            MonadState DSLState)
 
 data DSLState =
   DSLState
@@ -63,39 +64,42 @@ type Var = Lens' Vars Int
 
 makeLenses ''DSLState
 
+runDSL :: DSL a -> [a]
+runDSL dsl = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
+
 infixr 0 $=
-($=) :: Var -> Int -> DSL ()
-l $= i = DSL $ vars . l .= i
+($=) :: MonadState DSLState m => Var -> Int -> m ()
+l $= i = vars . l .= i
 
 infixl 7 $*
-($*) :: Var -> Var -> DSL Int
-x $* y = (*) <$> (DSL $ use (vars . x)) <*> (DSL $ use (vars . y))
+($*) :: (Applicative m, MonadState DSLState m) => Var -> Var -> m Int
+x $* y = (*) <$> (use (vars . x)) <*> (use (vars . y))
 
-addExpr :: DSL Bool -> DSL ()
-addExpr e = DSL $ exprs %= (e:)
+addExpr :: MonadState DSLState m => DSL Bool -> m ()
+addExpr e = exprs %= (e:)
 
-addPred :: (Int -> Int -> Bool) -> Var -> Var -> DSL ()
+addPred :: MonadState DSLState m => (Int -> Int -> Bool) -> Var -> Var -> m ()
 addPred p lx ly = addExpr $ do
-  x <- DSL $ use (vars . lx)
-  y <- DSL $ use (vars . ly)
+  x <- use (vars . lx)
+  y <- use (vars . ly)
   return $ p x y
 
 {-|
 >>> runDSL dsl1
 [(2,3,5)]
 -}
-dsl1 :: DSL Vars
+dsl1 :: MonadState DSLState m => m Vars
 dsl1 = do
   _1 $= 2
   _2 $= 3
   _3 $= 5
-  DSL $ use vars
+  use vars
 
 {-|
 >>> runDSL dsl2
 [6]
 -}
-dsl2 :: DSL Int
+dsl2 :: (Applicative m, MonadState DSLState m) => m Int
 dsl2 = do
   _1 $= 2
   _2 $= 3
@@ -113,7 +117,7 @@ pred1 x y = abs (x - y) < 2
 -}
 eval :: DSL Bool
 eval = do
-  es <- DSL $ use exprs
+  es <- use exprs
   liftM and $ sequence es
 
 dsl3 :: DSL Bool
@@ -126,5 +130,13 @@ dsl3 = do
   -- addExpr $ (*) <$> use _1 <*> use _2
   eval
 
-runDSL :: DSL a -> [a]
-runDSL dsl = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
+msAction :: Monad m => m Int
+msAction = return 1
+
+msAction2 :: MonadState DSLState m => m Int
+msAction2 = use (vars . _1)
+
+dsl4 :: MonadState DSLState m => m Int
+dsl4 = do
+  msAction
+  msAction2
