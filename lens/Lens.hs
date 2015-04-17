@@ -50,17 +50,14 @@ testRef l s = s ^. l > 2
 --
 
 newtype DSL a =
-  DSL { unDSL :: StateT (DSLState DSL) [] a }
-  deriving (Functor, Applicative, Monad, Alternative, MonadPlus,
-            MonadState (DSLState DSL))
+  DSL { unDSL :: StateT DSLState [] a }
+  deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
 
-data DSLState m =
+data DSLState =
   DSLState
-  { _exprs :: [m Bool]
+  { _exprs :: [DSL Bool]
   , _vars  :: Vars
   }
-
-type MonadDSL m = (Applicative m, MonadState (DSLState m) m)
 
 type Vars = (Int, Int, Int)
 type Var = Lens' Vars Int
@@ -68,47 +65,51 @@ type Var = Lens' Vars Int
 makeLenses ''DSLState
 
 runDSL :: DSL a -> [a]
-runDSL dsl = evalStateT `flip` (DSLState [] (0, 0, 0)) $ unDSL $ dsl
+runDSL dsl = evalStateT `flip` DSLState [] (0, 0, 0) $ unDSL dsl
 
 infixr 0 $=
-($=) :: MonadDSL m => Var -> Int -> m ()
-l $= i = vars . l .= i
+($=) :: Var -> Int -> DSL ()
+l $= i = DSL $ vars . l .= i
+
+infixr 0 $@
+($@) :: Var -> [Int] -> DSL ()
+l $@ i = (DSL $ lift i) >>= (l $=)
 
 infixl 7 $*
-($*) :: MonadDSL m => Var -> Var -> m Int
-x $* y = (*) <$> (use (vars . x)) <*> (use (vars . y))
+($*) :: Var -> Var -> DSL Int
+x $* y = DSL $ (*) <$> use (vars . x) <*> use (vars . y)
 
-addExpr :: MonadDSL m => m Bool -> m ()
-addExpr e = exprs %= (e:)
+addExpr :: DSL Bool -> DSL ()
+addExpr e = DSL $ exprs %= (e:)
 
-addPred :: MonadDSL m => (Int -> Int -> Bool) -> Var -> Var -> m ()
-addPred p lx ly = addExpr $ do
-  x <- use (vars . lx)
-  y <- use (vars . ly)
-  return $ p x y
+addPred :: (Int -> Int -> Bool) -> Var -> Var -> DSL ()
+addPred p lx ly = addExpr $ DSL $ p <$> use (vars . lx) <*> use (vars . ly)
+
+eval :: DSL Bool
+eval = do
+  es <- DSL $ use exprs
+  liftM and $ sequence es
 
 {-|
 >>> runDSL dsl1
 [(2,3,5)]
 -}
-dsl1 :: MonadDSL m => m Vars
+dsl1 :: DSL Vars
 dsl1 = do
   _1 $= 2
   _2 $= 3
   _3 $= 5
-  use vars
+  DSL $ use vars
 
 {-|
 >>> runDSL dsl2
 [6]
 -}
-dsl2 :: MonadDSL m => m Int
+dsl2 :: DSL Int
 dsl2 = do
   _1 $= 2
   _2 $= 3
-  _3 $= 5
-  n <- _1 $* _2
-  return n
+  _1 $* _2
 
 -- an user defined predicate
 pred1 :: Int -> Int -> Bool
@@ -116,30 +117,13 @@ pred1 x y = abs (x - y) < 2
 
 {-|
 >>> runDSL dsl3
-[False]
+[True,False]
 -}
-eval :: MonadDSL m => m Bool
-eval = do
-  es <- use exprs
-  liftM and $ sequence es
-
-dsl3 :: MonadDSL m => m Bool
+dsl3 :: DSL Bool
 dsl3 = do
   _1 $= 2
   _2 $= 3
-  _3 $= 5
+  _3 $@ [4, 5]
   addPred pred1 _1 _2
   addPred pred1 _2 _3
-  -- addExpr $ (*) <$> use _1 <*> use _2
   eval
-
-msAction :: Monad m => m Int
-msAction = return 1
-
-msAction2 :: MonadDSL m => m Int
-msAction2 = use (vars . _1)
-
-dsl4 :: MonadDSL m => m Int
-dsl4 = do
-  msAction
-  msAction2
