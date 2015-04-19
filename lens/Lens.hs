@@ -49,52 +49,51 @@ testRef l s = s ^. l > 2
 -- DSL with Lens/Prism
 --
 
-newtype DSL a =
-  DSL { unDSL :: StateT DSLState [] a }
+newtype DSL v a =
+  DSL { unDSL :: StateT (DSLState v) [] a }
   deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
 
-data DSLState =
+data DSLState v =
   DSLState
-  { _exprs :: [DSL Bool]
-  , _vars  :: Vars
+  { _exprs :: [DSL v Bool]
+  , _vars  :: v
   }
 
-type Vars = (Int, Int, Int)
-type Var = Lens' Vars Int
+type Var v a = Lens' v a
 
 makeLenses ''DSLState
 
-runDSL :: DSL a -> [a]
-runDSL dsl = evalStateT `flip` DSLState [] (0, 0, 0) $ unDSL dsl
+runDSL :: v -> DSL v a -> [a]
+runDSL v0 dsl = evalStateT `flip` DSLState [] v0 $ unDSL dsl
 
 infixr 0 $=
-($=) :: Var -> Int -> DSL ()
+($=) :: Var v a -> a -> DSL v ()
 l $= i = DSL $ vars . l .= i
 
 infixr 0 $@
-($@) :: Var -> [Int] -> DSL ()
+($@) :: Var v a -> [a] -> DSL v ()
 l $@ i = (DSL $ lift i) >>= (l $=)
 
 infixl 7 $*
-($*) :: Var -> Var -> DSL Int
+($*) :: Num a => Var v a -> Var v a -> DSL v a
 x $* y = DSL $ (*) <$> use (vars . x) <*> use (vars . y)
 
-addExpr :: DSL Bool -> DSL ()
+addExpr :: DSL v Bool -> DSL v ()
 addExpr e = DSL $ exprs %= (e:)
 
-addPred :: (Int -> Int -> Bool) -> Var -> Var -> DSL ()
+addPred :: (a -> b -> Bool) -> Var v a -> Var v b -> DSL v ()
 addPred p lx ly = addExpr $ DSL $ p <$> use (vars . lx) <*> use (vars . ly)
 
-eval :: DSL Bool
+eval :: DSL v Bool
 eval = do
   es <- DSL $ use exprs
   liftM and $ sequence es
 
 {-|
->>> runDSL dsl1
+>>> runDSL (0,0,0) dsl1
 [(2,3,5)]
 -}
-dsl1 :: DSL Vars
+dsl1 :: DSL (Int, Int, Int) (Int, Int, Int)
 dsl1 = do
   _1 $= 2
   _2 $= 3
@@ -102,10 +101,10 @@ dsl1 = do
   DSL $ use vars
 
 {-|
->>> runDSL dsl2
+>>> runDSL (0,0,0) dsl2
 [6]
 -}
-dsl2 :: DSL Int
+dsl2 :: DSL (Int, Int, Int) Int
 dsl2 = do
   _1 $= 2
   _2 $= 3
@@ -116,10 +115,10 @@ pred1 :: Int -> Int -> Bool
 pred1 x y = abs (x - y) < 2
 
 {-|
->>> runDSL dsl3
+>>> runDSL (0,0,0) dsl3
 [True,False]
 -}
-dsl3 :: DSL Bool
+dsl3 :: DSL (Int, Int, Int) Bool
 dsl3 = do
   _1 $= 2
   _2 $= 3
