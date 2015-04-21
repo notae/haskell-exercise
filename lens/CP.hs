@@ -12,6 +12,7 @@ import Control.Monad.State
 import qualified Data.Graph.Inductive.Internal.Queue as Q
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, fromMaybe)
+import Debug.Trace (traceShow, traceShowM)
 
 import qualified Data.Fuzzy as F
 
@@ -44,7 +45,9 @@ useV :: Var v a -> FD v a
 useV l = FD $ use (vars . l)
 
 useS :: Var v [a] -> FD v (Maybe a)
-useS l = useV l >>= return . listToMaybe
+useS l = do
+  as <- useV l
+  return $ if length as <= 1 then listToMaybe as else Nothing
 
 setS :: Var v [a] -> a -> FD v ()
 setS l a = FD $ vars . l .= [a]
@@ -52,11 +55,14 @@ setS l a = FD $ vars . l .= [a]
 addPCons :: FD v Grade -> FD v ()
 addPCons c = FD $ pcons %= (c:)
 
-cons2 :: Var v [a] -> Var v [b] -> (a -> b -> Grade) -> FD v Grade
+cons2 :: (FDValue a, FDValue b, Show v) =>
+         Var v [a] -> Var v [b] -> (a -> b -> Grade) -> FD v Grade
 cons2 a b p = do
   ma <- useS a
   mb <- useS b
   let g = p <$> ma <*> mb
+  v' <- FD $ use vars
+  traceShowM (ma, mb, g, v')
   return $ fromMaybe maxBound g
 
 eval :: FD v Grade
@@ -76,18 +82,21 @@ label l = do
 -- User code
 --
 
-cp1 :: FD ([Int], [Bool]) ((Int, Bool), Grade)
+cp1 :: FD ([Int], [Bool]) ((Int, Bool), Grade, (([Int], [Bool]), Grade))
 cp1 = do
   addPCons $ cons2 _1 _2 pred2
   -- TBD: pmap [
   y <- label _2
+  v' <- FD $ use vars
+  g' <- eval
   x <- label _1
+  -- traceShowM (v', g')
   let v = (x, y)
   -- TBD: ] pmap
   -- TBD: eval on local instead of StateT?
   g <- eval
-  guard $ g > minBound
-  return (v, g)
+  -- guard $ g > minBound
+  return (v, g, (v', g'))
 
 pred2 :: Int -> Bool -> Grade
 pred2 x y = g' where
@@ -97,7 +106,7 @@ pred2 x y = g' where
        2 -> 0
   g' = if y then g else F.fnot g
 
-test1 :: [((Int, Bool), Grade)]
+test1 :: [((Int, Bool), Grade, (([Int], [Bool]), Grade))]
 test1 = runFD ([0..2],[True,False]) cp1
 
 --
