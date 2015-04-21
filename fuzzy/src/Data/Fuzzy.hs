@@ -9,7 +9,7 @@ module Data.Fuzzy
        (
        -- * Basic Types
          Fuzzy (..)
-       , FValue, Grade
+       , FValue, Grade, fand, for
        , Membership
        -- * Fuzzy Set Types
        , FSet (..)
@@ -36,6 +36,7 @@ import           Data.Ratio          ((%))
 import           Data.Set            (Set)
 import qualified Data.Set            as Set
 import           Text.Show.Functions ()
+import Data.List (foldl')
 
 class Fuzzy a where
   -- | And (Intersection)
@@ -46,6 +47,12 @@ class Fuzzy a where
   (?|) :: a -> a -> a
   -- | Not (Complement)
   fnot :: a -> a
+
+fand :: Grade g => [g] -> g
+fand = foldl' (?&) maxBound
+
+for :: Grade g => [g] -> g
+for = foldl' (?|) minBound
 
 type FValue v = (Ord v, Show v)
 
