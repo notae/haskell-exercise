@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImpredicativeTypes         #-}
 {-# LANGUAGE RankNTypes                 #-}
@@ -24,18 +25,19 @@ import qualified Data.Fuzzy   as F
 --
 
 newtype FD v a =
-  FD { unFD :: StateT (FDState v) [] a }
-  deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
+  FD { unFD :: State (FDState v) a }
+  deriving (Functor, Applicative, Monad)
 
 data FDState v =
   FDState
   { _pcons :: [FD v Grade]
   , _stack :: [v]
+  , _count :: Int
   , _vars  :: v
   }
 
 initState :: v -> FDState v
-initState v0 = FDState [] [] v0
+initState = FDState [] [] 0
 
 type Var v a = Lens' v (Dom a)
 
@@ -45,8 +47,8 @@ type Val v = F.FValue v
 
 makeLenses ''FDState
 
-runFD :: v -> FD v a -> [a]
-runFD v0 dsl = evalStateT `flip` initState v0 $ unFD dsl
+runFD :: v -> FD v [a] -> [a]
+runFD v0 dsl = evalState `flip` initState v0 $ unFD dsl
 
 useV :: Var v a -> FD v (Dom a)
 useV l = FD $ use (vars . l)
@@ -80,7 +82,7 @@ cons2 a b p = do
   mb <- useS b
   let g = p <$> ma <*> mb
   v' <- FD $ use vars
-  traceShowM (ma, mb, g, v')
+  traceShowM ("cons2", ma, mb, g, v')
   return $ fromMaybe maxBound g
 
 eval :: FD v Grade
@@ -88,6 +90,7 @@ eval = do
   es <- FD $ use pcons
   liftM F.fand $ sequence es
 
+{-
 label :: Val a => Var v a -> FD v a
 label l = do
   as <- useV l
@@ -95,6 +98,7 @@ label l = do
   setS l a
   -- TBD: propagate arc.cons
   return a
+-}
 
 --
 -- User code
@@ -103,6 +107,7 @@ label l = do
 type V = (Int, Bool)
 type Vs = (Dom Int, Dom Bool)
 
+{-
 cp1 :: FD Vs (V, Grade)
 cp1 = do
   -- add primitive constraints
@@ -129,6 +134,57 @@ cp1 = do
   -- guard $ g > minBound
   return (v, g)
 
+test1 :: [(V, Grade)]
+test1 = runFD initDomain1 cp1
+-}
+
+{-
+data OptState =
+  OptState
+  { _dummy :: ()
+  } deriving (Show)
+
+makeLenses ''OptState
+
+initOptState :: OptState
+initOptState = OptState { _dummy = () }
+-}
+
+type OptState = ()
+initOptState :: OptState
+initOptState = ()
+
+optimize :: (Vars v, Show v) => FD v [(v, Grade)]
+optimize = optimize0 initOptState
+
+optimize0 :: (Vars v, Show v) => OptState -> FD v [(v, Grade)]
+optimize0 s = do
+  v <- FD $ use vars
+  FD $ count %= succ
+  c <- FD $ use count
+  traceShowM ("opt0", c, s, v)
+  if completed v
+    then do
+      g <- eval
+      return [(v, g)]
+    else do
+      let vs = expand1 v
+      vs' <- forM vs (optimize1 s)
+      return $ concat vs'
+
+optimize1 :: (Vars v, Show v) => OptState -> v -> FD v [(v, Grade)]
+optimize1 s v = do
+  push
+  FD $ vars .= v
+  vs <- optimize0 s
+  pop
+  return vs
+
+cp2 :: FD Vs [(Vs, Grade)]
+cp2 = do
+  addPCons $ cons2 _1 _2 pred2
+  optimize
+
 pred2 :: Int -> Bool -> Grade
 pred2 x y = g' where
   g = case x `mod` 3 of
@@ -137,19 +193,31 @@ pred2 x y = g' where
        _ -> 0
   g' = if y then g else F.fnot g
 
-test1 :: [(V, Grade)]
-test1 = runFD (F.fromCoreList [0..2], F.fromCoreList [True, False]) cp1
+initDomain1 :: (Dom Int, Dom Bool)
+initDomain1 = (F.fromCoreList [0..2], F.fromCoreList [True, False])
+
+-- test2 :: [(V, Grade)]
+test2 :: [(Vs, Grade)]
+test2 = runFD initDomain1 cp2
 
 --
 -- Variables
 --
 
 class Vars v where
-  expand1  :: v -> (Var v a, [a])
---  lenses ::
+  expand1 :: v -> [v]
+  completed :: v -> Bool
+  completed v = length (expand1 v) == 1
 
-vs' :: (Var Vs Int, Var Vs Bool)
-vs' = (_1, _2)
+instance (Val a, Val b) => Vars (Dom a, Dom b) where
+  expand1 (as, bs) =
+    if F.size as == 1
+    then [(F.fromCoreList [a], F.fromCoreList [b])
+         | a <- F.support as, b <- F.support bs]
+    else [(F.fromCoreList [a], bs) | a <- F.support as]
+
+-- vs' :: (Var Vs Int, Var Vs Bool)
+-- vs' = (_1, _2)
 
 {-
 ls :: (Lens' Vs [Int], Lens' Vs [Bool])
