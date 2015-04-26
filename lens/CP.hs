@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE ImpredicativeTypes         #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module CP where
 
@@ -58,8 +60,10 @@ useS l = do
   as <- useV l
   return $ if F.size as <= 1 then listToMaybe (F.support as) else Nothing
 
+{-
 setS :: Val a => Var v a -> a -> FD v ()
 setS l a = FD $ vars . l .= F.fromCoreList [a]
+-}
 
 push :: FD v ()
 push = do
@@ -138,26 +142,26 @@ test1 :: [(V, Grade)]
 test1 = runFD initDomain1 cp1
 -}
 
-{-
-data OptState =
+#if 1
+data OptState v =
   OptState
-  { _dummy :: ()
+  { _bestSols :: Maybe (Grade, [v])
   } deriving (Show)
 
 makeLenses ''OptState
 
-initOptState :: OptState
-initOptState = OptState { _dummy = () }
--}
-
+initOptState :: OptState v
+initOptState = OptState { _bestSols = Nothing }
+#else
 type OptState = ()
 initOptState :: OptState
 initOptState = ()
+#endif
 
-optimize :: (Vars v, Show v) => FD v [(v, Grade)]
+optimize :: (Vars v, Show v) => FD v [(Base v, Grade)]
 optimize = optimize0 initOptState
 
-optimize0 :: (Vars v, Show v) => OptState -> FD v [(v, Grade)]
+optimize0 :: (Vars v, Show v) => OptState v -> FD v [(Base v, Grade)]
 optimize0 s = do
   v <- FD $ use vars
   FD $ count %= succ
@@ -166,13 +170,13 @@ optimize0 s = do
   if completed v
     then do
       g <- eval
-      return [(v, g)]
+      return [(liftdown v, g)]
     else do
       let vs = expand1 v
       vs' <- forM vs (optimize1 s)
       return $ concat vs'
 
-optimize1 :: (Vars v, Show v) => OptState -> v -> FD v [(v, Grade)]
+optimize1 :: (Vars v, Show v) => OptState v -> v -> FD v [(Base v, Grade)]
 optimize1 s v = do
   push
   FD $ vars .= v
@@ -180,7 +184,7 @@ optimize1 s v = do
   pop
   return vs
 
-cp2 :: FD Vs [(Vs, Grade)]
+cp2 :: FD Vs [(V, Grade)]
 cp2 = do
   addPCons $ cons2 _1 _2 pred2
   optimize
@@ -196,8 +200,7 @@ pred2 x y = g' where
 initDomain1 :: (Dom Int, Dom Bool)
 initDomain1 = (F.fromCoreList [0..2], F.fromCoreList [True, False])
 
--- test2 :: [(V, Grade)]
-test2 :: [(Vs, Grade)]
+test2 :: [(V, Grade)]
 test2 = runFD initDomain1 cp2
 
 --
@@ -205,16 +208,20 @@ test2 = runFD initDomain1 cp2
 --
 
 class Vars v where
+  type Base v
   expand1 :: v -> [v]
   completed :: v -> Bool
   completed v = length (expand1 v) == 1
+  liftdown :: v -> Base v
 
 instance (Val a, Val b) => Vars (Dom a, Dom b) where
+  type Base (Dom a, Dom b) = (a, b)
   expand1 (as, bs) =
     if F.size as == 1
     then [(F.fromCoreList [a], F.fromCoreList [b])
          | a <- F.support as, b <- F.support bs]
     else [(F.fromCoreList [a], bs) | a <- F.support as]
+  liftdown (as, bs) = (head (F.support as), head (F.support bs))
 
 -- vs' :: (Var Vs Int, Var Vs Bool)
 -- vs' = (_1, _2)
@@ -243,8 +250,10 @@ instance LiftUp (a, b) where
   liftup f (a, b) = (f a, f b)
 -}
 
+{-
 class LiftDown f where
   liftdown :: (t a -> a) -> f (t a) -> f a
+-}
 
 mapWithLens :: (Field1 s s b b, Field2 s s b b, Field3 s s b b) => s -> [b]
 mapWithLens s = map (\l -> s ^. l) [_1,_2,_3]
