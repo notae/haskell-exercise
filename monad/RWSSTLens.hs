@@ -63,13 +63,19 @@ putLog l = do
   f <- DSL $ view traceFlag
   DSL $ when f $ tell [l]
 
+readVar :: String -> DSL s (Maybe Int)
+readVar n = DSL $ view (binding . at n)
+
+newRef :: Int -> DSL s (STRef s Int)
+newRef i = DSL $ lift $ newSTRef i
+
 --
 -- User code
 --
 
 {-|
 >>> test
-(1,DSLState {_count = 0},["start","val:1","var:1","end"])
+(1,DSLState {_count = 0},["start","val:1","var:1","i3:200","end"])
 -}
 test :: (Int, DSLState, Log)
 test = runDSL True testDSL
@@ -84,13 +90,26 @@ testWithoutLog = runDSL False testDSL
 testDSL :: DSL s Int
 testDSL = do
   putLog "start"
-  i <- DSL $ view (binding . at "one")
+  i <- readVar "one"
   let i' = fromMaybe 999 i
   putLog $ "val:" ++ show i'
-  v <- DSL $ lift $ newSTRef i'
+  v <- newRef i'
   i2 <- DSL $ local (var .~ Just v) $ do
     Just v2 <- asks _var
     lift $ readSTRef v2
   putLog $ "var:" ++ show i2
+  let ?ref = v
+  i3 <- testDSLSub
+  putLog $ "i3:" ++ show i3
   putLog $ "end"
   return i2
+
+testDSLSub :: (?ref::STRef s Int) => DSL s Int
+testDSLSub = do
+  testDSLSub2
+  i <- DSL $ lift $ readSTRef ?ref
+  return $ i * 100
+
+testDSLSub2 :: (?ref::STRef s Int) => DSL s ()
+testDSLSub2 = do
+  DSL $ lift $ modifySTRef ?ref succ
