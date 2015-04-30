@@ -10,15 +10,22 @@ import           Control.Monad
 import           Control.Monad.RWS
 import           Control.Monad.ST.Lazy
 import qualified Data.Map              as Map
+import           Data.Maybe            (fromMaybe)
 import           Data.STRef.Lazy
 
 import Control.Lens
 
--- import RWST
-
 --
 -- newtype with Lens
 --
+
+--
+-- Library
+--
+
+newtype DSL s a =
+  DSL { unDSL :: RWST (Env s) Log DSLState (ST s) a }
+  deriving (Functor, Applicative, Monad)
 
 data Env s =
   Env
@@ -27,11 +34,6 @@ data Env s =
   , _var       :: Maybe (STRef s Int)
   }
 
-makeLenses ''Env
-
-initEnv :: Bool -> Env s
-initEnv tf = Env tf (Map.fromList [("one", 1), ("two", 2)]) Nothing
-
 type Log = [String]
 
 data DSLState =
@@ -39,31 +41,51 @@ data DSLState =
   { _count :: Int
   } deriving (Show)
 
+makeLenses ''Env
 makeLenses ''DSLState
+
+runDSL :: Bool -> (forall s. DSL s a) -> (a, DSLState, Log)
+runDSL tf m = runST $ runRWST (unDSL m) (initEnv tf) initState
+
+initEnv :: Bool -> Env s
+initEnv tf =
+  Env
+  { _traceFlag = tf
+  , _binding = Map.fromList [("one", 1), ("two", 2)]
+  , _var = Nothing
+  }
 
 initState :: DSLState
 initState = DSLState { _count = 0 }
-
-newtype DSL s a =
-  DSL { unDSL :: RWST (Env s) Log DSLState (ST s) a }
-  deriving (Functor, Applicative, Monad)
-
--- runDSL :: forall s. DSL s a -> Env s -> DSLState -> (a, DSLState, Log)
--- runDSL m r s = runST $ runRWST (unDSL m) r s
-
-test :: Bool -> (Int, DSLState, Log)
-test tf = runST $ runRWST (unDSL testRWSST) (initEnv tf) initState
 
 putLog :: String -> DSL s ()
 putLog l = do
   f <- DSL $ view traceFlag
   DSL $ when f $ tell [l]
 
-testRWSST :: DSL s Int
-testRWSST = do
+--
+-- User code
+--
+
+{-|
+>>> test
+(1,DSLState {_count = 0},["start","val:1","var:1","end"])
+-}
+test :: (Int, DSLState, Log)
+test = runDSL True testDSL
+
+{-|
+>>> testWithoutLog
+(1,DSLState {_count = 0},[])
+-}
+testWithoutLog :: (Int, DSLState, Log)
+testWithoutLog = runDSL False testDSL
+
+testDSL :: DSL s Int
+testDSL = do
   putLog "start"
   i <- DSL $ view (binding . at "one")
-  let i' = maybe 999 id i
+  let i' = fromMaybe 999 i
   putLog $ "val:" ++ show i'
   v <- DSL $ lift $ newSTRef i'
   i2 <- DSL $ local (var .~ Just v) $ do
