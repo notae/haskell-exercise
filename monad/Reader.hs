@@ -13,4 +13,3 @@ initEnv = Env True [("one", 1), ("two", 2)]
 
 test = runReader `flip` initEnv $ do
   asks (lookup "two" . binding)
---   ask
