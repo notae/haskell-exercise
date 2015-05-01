@@ -106,15 +106,18 @@ testDSL1 = do
   let i' = fromMaybe 999 i
   putLog $ "val:" ++ show i'
   v <- newRef i'
-  i2 <- localRef v $ do
-    Just v2 <- getRef
-    readRef v2
+  i2 <- localRef v testDSLLocal
   putLog $ "var:" ++ show i2
   let ?ref = v
   i3 <- testDSLSub
   putLog $ "i3:" ++ show i3
-  putLog $ "end"
+  putLog "end"
   return i2
+
+testDSLLocal :: DSL m => m Int
+testDSLLocal = do
+  Just v2 <- getRef
+  readRef v2
 
 testDSLSub :: (DSL m, ?ref::Ref m) => m Int
 testDSLSub = do
