@@ -2,6 +2,7 @@
 {-# LANGUAGE ImplicitParams             #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module RWSSTLens where
 
@@ -23,51 +24,62 @@ import Control.Lens
 -- Library
 --
 
-newtype DSL s a =
-  DSL { unDSL :: RWST (Env s) Log DSLState (ST s) a }
+class Monad m => DSL m where
+  type Ref m
+  putLog :: String -> m ()
+  readVar :: String -> m (Maybe Int)
+  newRef :: Int -> m (Ref m)
+  getRef :: m (Maybe (Ref m))
+  readRef :: Ref m -> m Int
+  modifyRef :: Ref m -> (Int -> Int) -> m ()
+  localRef :: Ref m -> m Int -> m Int
+
+newtype DSL1 s a =
+  DSL1 { unDSL1 :: RWST (Env1 s) Log DSL1State (ST s) a }
   deriving (Functor, Applicative, Monad)
 
-data Env s =
-  Env
+data Env1 s =
+  Env1
   { _traceFlag :: Bool
   , _binding   :: Map.Map String Int
-  , _var       :: Maybe (STRef s Int)
+  , _var       :: Maybe (Ref (DSL1 s))
   }
 
 type Log = [String]
 
-data DSLState =
-  DSLState
+data DSL1State =
+  DSL1State
   { _count :: Int
   } deriving (Show)
 
-makeLenses ''Env
-makeLenses ''DSLState
+makeLenses ''Env1
+makeLenses ''DSL1State
 
-runDSL :: Bool -> (forall s. DSL s a) -> (a, DSLState, Log)
-runDSL tf m = runST $ runRWST (unDSL m) (initEnv tf) initState
+runDSL1 :: Bool -> (forall s. DSL1 s a) -> (a, DSL1State, Log)
+runDSL1 tf m = runST $ runRWST (unDSL1 m) (initEnv1 tf) initState1
 
-initEnv :: Bool -> Env s
-initEnv tf =
-  Env
+initEnv1 :: Bool -> Env1 s
+initEnv1 tf =
+  Env1
   { _traceFlag = tf
   , _binding = Map.fromList [("one", 1), ("two", 2)]
   , _var = Nothing
   }
 
-initState :: DSLState
-initState = DSLState { _count = 0 }
+initState1 :: DSL1State
+initState1 = DSL1State { _count = 0 }
 
-putLog :: String -> DSL s ()
-putLog l = do
-  f <- DSL $ view traceFlag
-  DSL $ when f $ tell [l]
-
-readVar :: String -> DSL s (Maybe Int)
-readVar n = DSL $ view (binding . at n)
-
-newRef :: Int -> DSL s (STRef s Int)
-newRef i = DSL $ lift $ newSTRef i
+instance DSL (DSL1 s) where
+  type Ref (DSL1 s) = STRef s Int
+  putLog l = do
+    f <- DSL1 $ view traceFlag
+    DSL1 $ when f $ tell [l]
+  readVar n = DSL1 $ view (binding . at n)
+  newRef i = DSL1 $ lift $ newSTRef i
+  getRef = DSL1 $ asks _var
+  readRef r = DSL1 $ lift $ readSTRef r
+  modifyRef r f = DSL1 $ lift $ modifySTRef r f
+  localRef r m = DSL1 $ local (var .~ Just r) (unDSL1 m)
 
 --
 -- User code
@@ -75,28 +87,28 @@ newRef i = DSL $ lift $ newSTRef i
 
 {-|
 >>> test
-(1,DSLState {_count = 0},["start","val:1","var:1","i3:200","end"])
+(1,DSL1State {_count = 0},["start","val:1","var:1","i3:200","end"])
 -}
-test :: (Int, DSLState, Log)
-test = runDSL True testDSL
+test :: (Int, DSL1State, Log)
+test = runDSL1 True testDSL1
 
 {-|
 >>> testWithoutLog
-(1,DSLState {_count = 0},[])
+(1,DSL1State {_count = 0},[])
 -}
-testWithoutLog :: (Int, DSLState, Log)
-testWithoutLog = runDSL False testDSL
+testWithoutLog :: (Int, DSL1State, Log)
+testWithoutLog = runDSL1 False testDSL1
 
-testDSL :: DSL s Int
-testDSL = do
+testDSL1 :: DSL m => m Int
+testDSL1 = do
   putLog "start"
   i <- readVar "one"
   let i' = fromMaybe 999 i
   putLog $ "val:" ++ show i'
   v <- newRef i'
-  i2 <- DSL $ local (var .~ Just v) $ do
-    Just v2 <- asks _var
-    lift $ readSTRef v2
+  i2 <- localRef v $ do
+    Just v2 <- getRef
+    readRef v2
   putLog $ "var:" ++ show i2
   let ?ref = v
   i3 <- testDSLSub
@@ -104,12 +116,11 @@ testDSL = do
   putLog $ "end"
   return i2
 
-testDSLSub :: (?ref::STRef s Int) => DSL s Int
+testDSLSub :: (DSL m, ?ref::Ref m) => m Int
 testDSLSub = do
   testDSLSub2
-  i <- DSL $ lift $ readSTRef ?ref
+  i <- readRef ?ref
   return $ i * 100
 
-testDSLSub2 :: (?ref::STRef s Int) => DSL s ()
-testDSLSub2 = do
-  DSL $ lift $ modifySTRef ?ref succ
+testDSLSub2 :: (DSL m, ?ref::Ref m) => m ()
+testDSLSub2 = modifyRef ?ref succ
