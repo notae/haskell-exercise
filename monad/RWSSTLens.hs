@@ -76,7 +76,7 @@ instance DSL (DSL1 s) where
     DSL1 $ when f $ tell [l]
   readVar n = DSL1 $ view (binding . at n)
   newRef i = DSL1 $ lift $ newSTRef i
-  getRef = DSL1 $ asks _var
+  getRef = DSL1 $ view var
   readRef r = DSL1 $ lift $ readSTRef r
   modifyRef r f = DSL1 $ lift $ modifySTRef r f
   localRef r m = DSL1 $ local (var .~ Just r) (unDSL1 m)
