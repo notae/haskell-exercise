@@ -13,6 +13,7 @@ import           Control.Monad.ST.Lazy
 import qualified Data.Map              as Map
 import           Data.Maybe            (fromMaybe)
 import           Data.STRef.Lazy
+import qualified Data.Sequence as Seq
 
 import Control.Lens
 
@@ -45,7 +46,7 @@ data Env1 s =
   , _var       :: Maybe (Ref (DSL1 s))
   }
 
-type Log = [String]
+type Log = Seq.Seq String
 
 data DSL1State =
   DSL1State
@@ -73,7 +74,7 @@ instance DSL (DSL1 s) where
   type Ref (DSL1 s) = STRef s Int
   putLog l = do
     f <- DSL1 $ view traceFlag
-    DSL1 $ when f $ tell [l]
+    DSL1 $ when f $ tell $ Seq.singleton l
   readVar n = DSL1 $ view (binding . at n)
   newRef i = DSL1 $ lift $ newSTRef i
   getRef = DSL1 $ view var
@@ -87,14 +88,14 @@ instance DSL (DSL1 s) where
 
 {-|
 >>> test
-(1,DSL1State {_count = 0},["start","val:1","var:1","i3:200","end"])
+(1,DSL1State {_count = 0},fromList ["start","val:1","var:1","i3:200","end"])
 -}
 test :: (Int, DSL1State, Log)
 test = runDSL1 True testDSL1
 
 {-|
 >>> testWithoutLog
-(1,DSL1State {_count = 0},[])
+(1,DSL1State {_count = 0},fromList [])
 -}
 testWithoutLog :: (Int, DSL1State, Log)
 testWithoutLog = runDSL1 False testDSL1
