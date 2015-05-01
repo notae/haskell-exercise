@@ -12,8 +12,8 @@ import           Control.Monad.RWS
 import           Control.Monad.ST.Lazy
 import qualified Data.Map              as Map
 import           Data.Maybe            (fromMaybe)
+import qualified Data.Sequence         as Seq
 import           Data.STRef.Lazy
-import qualified Data.Sequence as Seq
 
 import Control.Lens
 
@@ -22,7 +22,7 @@ import Control.Lens
 --
 
 --
--- Library
+-- Library code
 --
 
 class Monad m => DSL m where
@@ -73,14 +73,20 @@ initState1 = DSL1State { _count = 0 }
 instance DSL (DSL1 s) where
   type Ref (DSL1 s) = STRef s Int
   putLog l = do
-    f <- DSL1 $ view traceFlag
+    f <- view1 traceFlag
     DSL1 $ when f $ tell $ Seq.singleton l
-  readVar n = DSL1 $ view (binding . at n)
-  newRef i = DSL1 $ lift $ newSTRef i
-  getRef = DSL1 $ view var
-  readRef r = DSL1 $ lift $ readSTRef r
-  modifyRef r f = DSL1 $ lift $ modifySTRef r f
+  readVar n = view1 (binding . at n)
+  newRef i = liftST $ newSTRef i
+  getRef = view1 var
+  readRef r = liftST $ readSTRef r
+  modifyRef r f = liftST $ modifySTRef r f
   localRef r m = DSL1 $ local (var .~ Just r) (unDSL1 m)
+
+liftST :: ST s a -> DSL1 s a
+liftST = DSL1 . lift
+
+view1 :: Getting a (Env1 s) a -> DSL1 s a
+view1 = DSL1 . view
 
 --
 -- User code
