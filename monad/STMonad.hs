@@ -1,19 +1,21 @@
 -- ST Monad Example
 
-import Control.Monad.ST (ST)
-import Control.Monad.ST (runST)
-import Data.STRef (STRef)
-import Data.STRef (modifySTRef)
-import Data.STRef (newSTRef)
-import Data.STRef (readSTRef)
-import Data.Traversable (Traversable)
+module STMonad where
+
+import           Control.Monad    (replicateM_)
+import           Control.Monad.ST (ST)
+import           Control.Monad.ST (runST)
+import           Data.Set         (Set)
+import           Data.Set         (deleteMin)
+import qualified Data.Set         as Set
+import           Data.STRef       (STRef)
+import           Data.STRef       (modifySTRef)
+import           Data.STRef       (newSTRef)
+import           Data.STRef       (readSTRef)
+import           Data.STRef       (writeSTRef)
+import           Data.Traversable (Traversable)
 import qualified Data.Traversable as Traversable
 import qualified Data.Traversable as Traversable
-import Data.Set (Set)
-import Data.Set (deleteMin)
-import qualified Data.Set as Set
-import Control.Monad (replicateM_)
-import Data.STRef (writeSTRef)
 
 prog :: Int -> ST s Int
 prog i = do

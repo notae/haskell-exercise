@@ -1,9 +1,11 @@
 -- ListT Example
 
-import Control.Monad.List (ListT(..))
-import Control.Monad.State (State)
-import Control.Monad.State (modify)
-import Control.Monad.Trans (lift)
+module ListT where
+
+import Control.Monad.List   (ListT (..))
+import Control.Monad.State  (State)
+import Control.Monad.State  (modify)
+import Control.Monad.Trans  (lift)
 import Control.Monad.Writer (Writer)
 import Control.Monad.Writer (tell)
 
