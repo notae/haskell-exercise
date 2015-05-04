@@ -44,6 +44,19 @@ testRef l s = s ^. l > 2
 ["*","**","***"]
 -}
 
+-- Traversal
+{-|
+>>> mapMOf (traverse._2) (\xs -> putStrLn (reverse xs)) [(12,"foo"),(34,"bar")]
+oof
+rab
+[(12,()),(34,())]
+>>> mapMOf (both._2) (\xs -> putStrLn (reverse xs)) ((12,"foo"),(34,"bar"))
+oof
+rab
+((12,()),(34,()))
+>>> (fromMaybe [] $ [(123,True),(456,False)] & mapMOf (each._1) (\a -> Just (a:[]))) & mapMOf (each._2) (\a -> Just (a:[]))
+Just [([123],[True]),([456],[False])]
+-}
 
 --
 -- DSL with Lens/Prism
