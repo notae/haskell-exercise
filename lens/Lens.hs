@@ -1,14 +1,13 @@
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Lens where
 
-import Control.Applicative (Alternative, Applicative, (<$>), (<*>))
+import Control.Applicative
 import Control.Lens
+import Control.Lens.Action
 import Control.Monad.State
+import Data.Maybe
 
 type Degrees = Double
 type Latitude = Degrees
@@ -58,84 +57,92 @@ rab
 Just [([123],[True]),([456],[False])]
 -}
 
---
--- DSL with Lens/Prism
---
-
-newtype DSL v a =
-  DSL { unDSL :: StateT (DSLState v) [] a }
-  deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
-
-data DSLState v =
-  DSLState
-  { _exprs :: [DSL v Bool]
-  , _vars  :: v
-  }
-
-type Var v a = Lens' v a
-
-makeLenses ''DSLState
-
-runDSL :: v -> DSL v a -> [a]
-runDSL v0 dsl = evalStateT `flip` DSLState [] v0 $ unDSL dsl
-
-infixr 0 $=
-($=) :: Var v a -> a -> DSL v ()
-l $= i = DSL $ vars . l .= i
-
-infixr 0 $@
-($@) :: Var v a -> [a] -> DSL v ()
-l $@ i = (DSL $ lift i) >>= (l $=)
-
-infixl 7 $*
-($*) :: Num a => Var v a -> Var v a -> DSL v a
-x $* y = DSL $ (*) <$> use (vars . x) <*> use (vars . y)
-
-addExpr :: DSL v Bool -> DSL v ()
-addExpr e = DSL $ exprs %= (e:)
-
-addPred :: (a -> b -> Bool) -> Var v a -> Var v b -> DSL v ()
-addPred p lx ly = addExpr $ DSL $ p <$> use (vars . lx) <*> use (vars . ly)
-
-eval :: DSL v Bool
-eval = do
-  es <- DSL $ use exprs
-  liftM and $ sequence es
+-- Iso
 
 {-|
->>> runDSL (0,0,0) dsl1
-[(2,3,5)]
+>>> Just 123 ^. someIso
+Right 123
+>>> Right 123 ^. from someIso
+Just 123
 -}
-dsl1 :: DSL (Int, Int, Int) (Int, Int, Int)
-dsl1 = do
-  _1 $= 2
-  _2 $= 3
-  _3 $= 5
-  DSL $ use vars
+someIso :: Iso' (Maybe a) (Either () a)
+someIso = iso f g where
+  f (Just a) = Right a
+  f Nothing = Left ()
+  g (Left _) = Nothing
+  g (Right a) = Just a
+
+type NEList a = (a, [a])
 
 {-|
->>> runDSL (0,0,0) dsl2
-[6]
+>>> (1,[2,3]) ^. neIso
+1
+>>> 1 ^. from neIso
+(1,[])
 -}
-dsl2 :: DSL (Int, Int, Int) Int
-dsl2 = do
-  _1 $= 2
-  _2 $= 3
-  _1 $* _2
-
--- an user defined predicate
-pred1 :: Int -> Int -> Bool
-pred1 x y = abs (x - y) < 2
+neIso :: Iso' (a, [a]) a
+neIso = iso f g where
+  f (a, _) = a
+  g a = (a, [])
 
 {-|
->>> runDSL (0,0,0) dsl3
-[True,False]
+>>> [1,2,3] ^. oneIso
+Just 1
+>>> Just 1 ^. from oneIso
+[1]
+>>> [] ^. oneIso
+Nothing
+>>> Nothing ^. from oneIso
+[]
 -}
-dsl3 :: DSL (Int, Int, Int) Bool
-dsl3 = do
-  _1 $= 2
-  _2 $= 3
-  _3 $@ [4, 5]
-  addPred pred1 _1 _2
-  addPred pred1 _2 _3
-  eval
+oneIso :: Iso' [a] (Maybe a)
+oneIso = iso f g where
+  f = listToMaybe
+  g = maybeToList
+
+type PairList a b = [(a, b)]
+pl1 :: PairList Int Bool
+pl1 = [(1, True), (2, False)]
+
+{-|
+>>> pl1 & traverseOf (each . _1) Just
+Just [(1,True),(2,False)]
+>>> pl1 & traverseOf (each . _1) %~ Just
+[(Just 1,True),(Just 2,False)]
+-}
+
+{-|
+>>> plMap show pl1
+[("1","True"),("2","False")]
+-}
+plMap :: (forall e. e -> f e) -> PairList a b -> PairList (f a) (f b)
+plMap f = tr _2 . tr _1  where
+  tr l = traverseOf (each . l) %~ f
+
+{-|
+>>> plLift pl1 :: PairList [Int] [Bool]
+[([1],[True]),([2],[False])]
+-}
+plLift :: Applicative f => PairList a b -> PairList (f a) (f b)
+plLift = plMap pure
+
+{-
+f (Dom a) -> f (Maybe a)
+f (Maybe a) -> Maybe (f a)
+-}
+
+type LiftDown a f m = forall f. f (m a) -> m (f a)
+
+-- ld :: LiftDown a
+-- ld
+
+ldt :: (Traversable t, Applicative f) => t (f Int) -> f (t Int)
+ldt = traverse id
+
+ldt1 :: Maybe [Int]
+ldt1 = ldt [Just 1, Just 2]
+
+ldt2 :: Maybe [Int]
+ldt2 = ldt [Just 1, Nothing]
+
+type LDIso t f a = Iso' (t (f a)) (f (t a))
