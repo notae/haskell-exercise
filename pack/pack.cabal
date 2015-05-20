@@ -19,6 +19,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     NT
                      , Pack
+                     , Pack2
                      , Generics
                      , Functor
                      , Unlift
