@@ -105,12 +105,33 @@ pl1 :: PairList Int Bool
 pl1 = [(1, True), (2, False)]
 
 {-|
->>> pl1 & traverseOf (each . _1) Just
+>>> pl2
 Just [(1,True),(2,False)]
+>>> pl3
+Just [(2,True),(3,False)]
+>>> pl4
+Just [(1,False),(2,True)]
+>>> pl5
+Just [(2,False),(3,True)]
+
 >>> pl1 & traverseOf (each . _1) %~ Just
 [(Just 1,True),(Just 2,False)]
 -}
 
+pl2 :: Maybe (PairList Int Bool)
+pl2 = pl1 & traverseOf (each . _1) Just
+inc1 :: PairList Int Bool -> Maybe (PairList Int Bool)
+inc1 = traverseOf (each . _1) (Just . succ)
+pl3 :: Maybe [(Int, Bool)]
+pl3 = pl1 & inc1
+not2 :: PairList Int Bool -> Maybe (PairList Int Bool)
+not2 = traverseOf (each . _2) (Just . not)
+pl4 :: Maybe [(Int, Bool)]
+pl4 = pl1 & not2
+pl5 :: Maybe (PairList Int Bool)
+pl5 = (pl1 & inc1) >>= not2
+
+{-|
 {-|
 >>> plMap show pl1
 [("1","True"),("2","False")]
@@ -125,24 +146,32 @@ plMap f = tr _2 . tr _1  where
 -}
 plLift :: Applicative f => PairList a b -> PairList (f a) (f b)
 plLift = plMap pure
-
-{-
-f (Dom a) -> f (Maybe a)
-f (Maybe a) -> Maybe (f a)
 -}
 
-type LiftDown a f m = forall f. f (m a) -> m (f a)
 
--- ld :: LiftDown a
--- ld
+pld1 :: PairList [Int] [Bool]
+pld1 = [([1, 2, 3], [True, False])
+       ,([2, 3, 4], [True, False])]
 
-ldt :: (Traversable t, Applicative f) => t (f Int) -> f (t Int)
-ldt = traverse id
+plTraverse :: Applicative f
+           => (forall x. x -> f x) -> PairList a b -> f (PairList a b)
+plTraverse f = traverse (tupleTraverse f)
+-- plTraverse f t = tr2 . tr1 t where
+--   tr1 = traverseOf (each . _1) f
+--   tr2 = traverseOf (each . _2) f
 
-ldt1 :: Maybe [Int]
-ldt1 = ldt [Just 1, Just 2]
+tupleTraverse :: Applicative f
+              => (forall x. x -> f x) -> (a, b) -> f (a, b)
+tupleTraverse f (a, b) = (,) <$> f a <*> f b
 
-ldt2 :: Maybe [Int]
-ldt2 = ldt [Just 1, Nothing]
+testTT :: Maybe (Int, Bool)
+testTT = tupleTraverse (Just) (1, False)
+
+
+-- liftdown
+
+type PLiftIso a b f = Iso' (a, b) (f a, f b)
 
 type LDIso t f a = Iso' (t (f a)) (f (t a))
+
+type LiftDown a f m = forall f. f (m a) -> m (f a)
