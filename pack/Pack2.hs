@@ -9,6 +9,7 @@
 module Pack2 where
 
 import Control.Applicative
+import Control.Monad
 import Data.Dynamic
 import Data.Functor.Identity
 import Data.Maybe
@@ -29,7 +30,7 @@ class PackMap p where
   pNT f     = runIdentity . pNTM (Identity . f)
   -- TBD: put x under constraints
   pToList   :: Applicative f => (forall x. f x -> y) -> p f -> [y]
-  pToList'  :: Applicative f => p f -> [Dynamic]
+  pToList'  :: (Applicative f, Typeable f) => p f -> [Dynamic]
   pFoldM    :: Applicative f => (forall x. s -> f x -> s) -> s -> p f -> s
 
 newtype PairL a b f = PairL (f a, f b) deriving (Show, Eq)
@@ -38,9 +39,10 @@ instance PackLift (a, b) (PairL a b) where
   pLiftUp (a, b) = PairL (pure a, pure b)
   pLiftDown (PairL (a, b)) = (,) <$> a <*> b
 
-instance PackMap (PairL a b) where
+instance (Typeable a, Typeable b) => PackMap (PairL a b) where
   pNTM f (PairL (a, b)) = PairL <$> ((,) <$> f a <*> f b)
   pToList f (PairL (a, b)) = [f a, f b]
+  pToList' (PairL (a, b)) = [toDyn a, toDyn b]
   pFoldM f s0 (PairL (a, b)) = f (f s0 a) b
 
 type Pack b p = (PackLift b p, PackMap p)
