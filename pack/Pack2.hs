@@ -11,6 +11,7 @@ module Pack2 where
 import Control.Applicative
 import Control.Monad
 import Data.Dynamic
+import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe
 import Data.Monoid
@@ -33,6 +34,25 @@ class PackMap p where
   pToList'  :: (Applicative f, Typeable f) => p f -> [Dynamic]
   pFoldM    :: Applicative f => (forall x. s -> f x -> s) -> s -> p f -> s
 
+type Pack b p = (PackLift b p, PackMap p)
+
+-- Instances for Traversable
+
+newtype WrappedTraversable t a f =
+  WrapTraversable { unwrapTraversable :: t (f a) }
+  deriving Show
+
+instance Traversable t => PackLift (t a) (WrappedTraversable t a) where
+  pLiftUp = WrapTraversable . fmap pure
+  pLiftDown (WrapTraversable t) = traverse id t
+
+instance (Traversable t, Typeable a) => PackMap (WrappedTraversable t a) where
+  pNTM f (WrapTraversable t) = WrapTraversable <$> traverse f t
+  pToList f (WrapTraversable t) = fmap f (toList t)
+  pToList' (WrapTraversable t) = fmap toDyn (toList t)
+
+-- Instances for (a, b)
+
 newtype PairL a b f = PairL (f a, f b) deriving (Show, Eq)
 
 instance PackLift (a, b) (PairL a b) where
@@ -44,8 +64,6 @@ instance (Typeable a, Typeable b) => PackMap (PairL a b) where
   pToList f (PairL (a, b)) = [f a, f b]
   pToList' (PairL (a, b)) = [toDyn a, toDyn b]
   pFoldM f s0 (PairL (a, b)) = f (f s0 a) b
-
-type Pack b p = (PackLift b p, PackMap p)
 
 pl0 :: (Int, Bool)
 pl0 = (1, True)
