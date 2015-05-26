@@ -101,10 +101,10 @@ doubleImageBilinear src = dst where
     valid x y = 0 <= x && x < w && 0 <= y && y < h
     pixelAtM x y = if valid x y then Just $ pixelAt src x y else Nothing
     p = bilinear <$> pure rx <*> pure ry <*> p11 <*> p12 <*> p21 <*> p22 <|>
-        linear <$> pure rx <*> p11 <*> p12 <|>
-        linear <$> pure rx <*> p21 <*> p22 <|>
-        linear <$> pure ry <*> p11 <*> p21 <|>
-        linear <$> pure ry <*> p21 <*> p22 <|>
+        bilinear2 <$> pure rx <*> p11 <*> p12 <|>
+        bilinear2 <$> pure rx <*> p21 <*> p22 <|>
+        bilinear2 <$> pure ry <*> p11 <*> p21 <|>
+        bilinear2 <$> pure ry <*> p21 <*> p22 <|>
         p11 <|> p12 <|> p21 <|> p22
     -- itor :: Int -> Rational
     itor :: Int -> Float
@@ -119,12 +119,12 @@ bilinear u v p q r s =
 {-# SPECIALIZE bilinear :: Float -> Float -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 {-# SPECIALIZE bilinear :: Rational -> Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
-linear :: (RealFrac t, Pixel a, Integral (PixelBaseComponent a))
+bilinear2 :: (RealFrac t, Pixel a, Integral (PixelBaseComponent a))
          => t -> a -> a -> a
-linear u p q = mixWith (mix u) p q
--- {-# INLINE linear #-}
-{-# SPECIALIZE linear :: Float -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
-{-# SPECIALIZE linear :: Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
+bilinear2 u p q = mixWith (mix u) p q
+-- {-# INLINE bilinear2 #-}
+{-# SPECIALIZE bilinear2 :: Float -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
+{-# SPECIALIZE bilinear2 :: Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
 mix :: (RealFrac t, Integral a) => t -> Int -> a -> a -> a
 mix t _ x y = floor (fromIntegral x * (1 - t) + fromIntegral y * t)
