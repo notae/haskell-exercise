@@ -43,7 +43,7 @@ doubleImageFileBilinear path = do
   Right dimg <- readImage path
   let img = convToImageRGB8 dimg
   let img' = ImageRGB8 $ doubleImageBilinear img
-  let path' = "2xave_" ++ path
+  let path' = "2xbilinear_" ++ path
   savePngImage path' img'
 
 convToImageRGB8 :: DynamicImage -> Image PixelRGB8
@@ -85,14 +85,13 @@ doubleImageBilinear src = dst where
   h = imageHeight src
   n = 2
   dst = generateImage f (w * n) (h * n)
-  f x y | (x == 0) && traceShow (x, y) False = undefined
+  f x y | (x == 0 && y `mod` 64 == 0) && traceShow (x, y) False = undefined
   f x y = fromMaybe showError p where
     showError = error $ "doubleImageAve: internal error: " ++
                 show ((x, y), (sx, sy), (sx11, sy11))
     s i = (itor i * 2 - itor (n - 1)) / itor (2 * n)
     (sx, sy) = (s x, s y)
     (sx11, sy11) = (floor sx, floor sy)
-    rx, ry :: Rational
     rx = sx - itor sx11
     ry = sy - itor sy11
     p11 = pixelAtM sx11       sy11
@@ -107,25 +106,28 @@ doubleImageBilinear src = dst where
         linear <$> pure ry <*> p11 <*> p21 <|>
         linear <$> pure ry <*> p21 <*> p22 <|>
         p11 <|> p12 <|> p21 <|> p22
+    -- itor :: Int -> Rational
+    itor :: Int -> Float
+    itor = fromInteger . toInteger
+    {-# INLINE itor #-}
 
-bilinear :: (Pixel a, Integral (PixelBaseComponent a))
-         => Rational -> Rational -> a -> a -> a -> a -> a
+bilinear :: (RealFrac t, Pixel a, Integral (PixelBaseComponent a))
+         => t -> t -> a -> a -> a -> a -> a
 bilinear u v p q r s =
   mixWith (mix v) (mixWith (mix u) p q) (mixWith (mix u) r s) where
-{-# INLINE bilinear #-}
+-- {-# INLINE bilinear #-}
+{-# SPECIALIZE bilinear :: Float -> Float -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 {-# SPECIALIZE bilinear :: Rational -> Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
-linear :: (Pixel a, Integral (PixelBaseComponent a))
-         => Rational -> a -> a -> a
+linear :: (RealFrac t, Pixel a, Integral (PixelBaseComponent a))
+         => t -> a -> a -> a
 linear u p q = mixWith (mix u) p q
-{-# INLINE linear #-}
+-- {-# INLINE linear #-}
+{-# SPECIALIZE linear :: Float -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 {-# SPECIALIZE linear :: Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
-mix :: Integral a => Rational -> t -> a -> a -> a
+mix :: (RealFrac t, Integral a) => t -> Int -> a -> a -> a
 mix t _ x y = floor (fromIntegral x * (1 - t) + fromIntegral y * t)
 {-# INLINE mix #-}
-{-# SPECIALIZE mix :: Rational -> Int -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 #-}
-
-itor :: Int -> Rational
-itor = fromInteger . toInteger
-{-# INLINE itor #-}
+-- {-# SPECIALIZE mix :: Float -> Int -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 #-}
+-- {-# SPECIALIZE mix :: Rational -> Int -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 #-}
