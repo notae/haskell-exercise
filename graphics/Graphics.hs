@@ -1,12 +1,21 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Graphics where
+-- module Graphics where
 
 import Codec.Picture
 import Codec.Picture.Types
 import Control.Applicative
 import Data.Maybe
 import Debug.Trace         (traceShow)
+import System.Environment  (getArgs)
+
+main :: IO ()
+main = do
+  [cmd, path] <- getArgs
+  case cmd of
+   "simple" -> doubleImageFileSimple path
+   "bilinear" -> doubleImageFileBilinear path
+   _ -> error "unknown command"
 
 -- example
 imageCreator :: String -> IO ()
@@ -103,13 +112,20 @@ bilinear :: (Pixel a, Integral (PixelBaseComponent a))
          => Rational -> Rational -> a -> a -> a -> a -> a
 bilinear u v p q r s =
   mixWith (mix v) (mixWith (mix u) p q) (mixWith (mix u) r s) where
+{-# INLINE bilinear #-}
+{-# SPECIALIZE bilinear :: Rational -> Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
 linear :: (Pixel a, Integral (PixelBaseComponent a))
          => Rational -> a -> a -> a
 linear u p q = mixWith (mix u) p q
+{-# INLINE linear #-}
+{-# SPECIALIZE linear :: Rational -> PixelRGB8 -> PixelRGB8 -> PixelRGB8 #-}
 
 mix :: Integral a => Rational -> t -> a -> a -> a
 mix t _ x y = floor (fromIntegral x * (1 - t) + fromIntegral y * t)
+{-# INLINE mix #-}
+{-# SPECIALIZE mix :: Rational -> Int -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 -> PixelBaseComponent PixelRGB8 #-}
 
 itor :: Int -> Rational
 itor = fromInteger . toInteger
+{-# INLINE itor #-}
