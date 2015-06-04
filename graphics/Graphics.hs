@@ -19,7 +19,8 @@ type ImageConverter = DynamicImage -> DynamicImage
 
 converters :: [(String, ImageConverter)]
 converters = [ ("simple2x",   convSimple2x)
-             , ("bilinear2x", convBilinear2x)
+             , ("bilinear2x", convBilinearNxRGB8 2)
+             , ("bilinear3x", convBilinearNxRGB8 3)
              ]
 
 convImageFile :: ImageConverter -> FilePath -> FilePath -> IO ()
@@ -38,8 +39,8 @@ doubleImageSimple src = dst where
   dst = generateImage f (w * 2) (h * 2)
   f x y = pixelAt src (x `div` 2) (y `div` 2)
 
-convBilinear2x :: ImageConverter
-convBilinear2x = ImageRGB8 . doubleImageBilinear . convToImageRGB8
+convBilinearNxRGB8 :: Int -> ImageConverter
+convBilinearNxRGB8 n = ImageRGB8 . convBilinearNx n . convToImageRGB8
 
 convToImageRGB8 :: DynamicImage -> Image PixelRGB8
 convToImageRGB8 dimg = case dimg of
@@ -73,16 +74,15 @@ convToImageRGB16 dimg = case dimg of
   ImageCMYK8 _ -> error "ImageCMYK8"
   ImageCMYK16 _ -> error "ImageCMYK16"
 
-doubleImageBilinear :: (Pixel a, Integral (PixelBaseComponent a))
-                    => Image a -> Image a
-doubleImageBilinear src = dst where
+convBilinearNx :: (Pixel a, Integral (PixelBaseComponent a))
+                => Int -> Image a -> Image a
+convBilinearNx n src = dst where
   w = imageWidth src
   h = imageHeight src
-  n = 2
   dst = generateImage f (w * n) (h * n)
   f x y | (x == 0 && y `mod` 64 == 0) && traceShow (x, y) False = undefined
   f x y = fromMaybe showError p where
-    showError = error $ "doubleImageAve: internal error: " ++
+    showError = error $ "convBilinearNx: internal error: " ++
                 show ((x, y), (sx, sy), (sx11, sy11))
     s i = (itor i * 2 - itor (n - 1)) / itor (2 * n)
     (sx, sy) = (s x, s y)
