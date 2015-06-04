@@ -15,12 +15,21 @@ imageCreator path = writePng path $ generateImage pixelRenderer 250 300
            where x' = fromInteger (toInteger x)
                  y' = fromInteger (toInteger y)
 
-doubleImageFileSimple :: String -> IO ()
-doubleImageFileSimple path = do
+type ImageConverter = DynamicImage -> DynamicImage
+
+converters :: [(String, ImageConverter)]
+converters = [ ("simple2x",   convSimple2x)
+             , ("bilinear2x", convBilinear2x)
+             ]
+
+convImageFile :: ImageConverter -> FilePath -> FilePath -> IO ()
+convImageFile conv path path' = do
   Right dimg <- readImage path
-  let img' = dynamicPixelMap doubleImageSimple dimg
-  let path' = "2xsimple_" ++ path
-  savePngImage path' img'
+  let dimg' = conv dimg
+  savePngImage path' dimg'
+
+convSimple2x :: ImageConverter
+convSimple2x = dynamicPixelMap doubleImageSimple
 
 doubleImageSimple :: Pixel a => Image a -> Image a
 doubleImageSimple src = dst where
@@ -29,13 +38,8 @@ doubleImageSimple src = dst where
   dst = generateImage f (w * 2) (h * 2)
   f x y = pixelAt src (x `div` 2) (y `div` 2)
 
-doubleImageFileBilinear :: String -> IO ()
-doubleImageFileBilinear path = do
-  Right dimg <- readImage path
-  let img = convToImageRGB8 dimg
-  let img' = ImageRGB8 $ doubleImageBilinear img
-  let path' = "2xbilinear_" ++ path
-  savePngImage path' img'
+convBilinear2x :: ImageConverter
+convBilinear2x = ImageRGB8 . doubleImageBilinear . convToImageRGB8
 
 convToImageRGB8 :: DynamicImage -> Image PixelRGB8
 convToImageRGB8 dimg = case dimg of
