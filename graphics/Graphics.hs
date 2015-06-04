@@ -1,21 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 
--- module Graphics where
+module Graphics where
 
 import Codec.Picture
 import Codec.Picture.Types
 import Control.Applicative
 import Data.Maybe
 import Debug.Trace         (traceShow)
-import System.Environment  (getArgs)
-
-main :: IO ()
-main = do
-  [cmd, path] <- getArgs
-  case cmd of
-   "simple" -> doubleImageFileSimple path
-   "bilinear" -> doubleImageFileBilinear path
-   _ -> error "unknown command"
 
 -- example
 imageCreator :: String -> IO ()

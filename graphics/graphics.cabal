@@ -26,13 +26,12 @@ library
   -- hs-source-dirs:      
   default-language:    Haskell2010
 
-Executable graphics-test
+Executable conv
   Default-Language:     Haskell2010
-  Main-Is:              Graphics.hs
+  Main-Is:              ConvMain.hs
   -- Other-Modules:
   GHC-Options:          -Wall -O2
   build-depends:       base
                      , array
                      , JuicyPixels
                      , lens
-
