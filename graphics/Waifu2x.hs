@@ -15,6 +15,7 @@ module Main where
 import           Control.Applicative
 import qualified Data.ByteString.Lazy as B
 import           Data.Data            (Data, Typeable, toConstr)
+import           Data.Either
 import           Debug.Trace          (traceShow)
 import           GHC.Generics         (Generic)
 import           System.Environment   (getArgs)
@@ -29,6 +30,9 @@ import Data.Aeson.TH
 --
 -- Utils
 --
+
+dumpTitle :: String -> IO ()
+dumpTitle name = putStrLn $ "== " ++ name ++ " =="
 
 dump :: Show a => String -> a -> IO ()
 dump name val = putStrLn $ name ++ ": " ++ show val
@@ -68,16 +72,48 @@ dumpModel model = do
 
 dumpStep :: Step -> IO ()
 dumpStep step = do
-  putStrLn "== Step =="
+  dumpTitle "Step"
   dump "nInputPlane" (step ^. nInputPlane)
   dump "nOutputPlane" (step ^. nOutputPlane)
 
 --
--- Core
+-- Image
 --
 
-waifu2x :: Model -> DynamicImage -> DynamicImage
-waifu2x model = id
+toImageYCbCr8 :: DynamicImage -> Maybe (Image PixelYCbCr8)
+toImageYCbCr8 dimg = case dimg of
+  ImageYCbCr8 img -> Just img
+  _ -> Nothing
+
+doubleImageNN :: Pixel a => Image a -> Image a
+doubleImageNN src = dst where
+  w = imageWidth src
+  h = imageHeight src
+  dst = generateImage f (w * 2) (h * 2)
+  f x y = pixelAt src (x `div` 2) (y `div` 2)
+
+--
+-- Waifu2x Core
+--
+
+waifu2x :: Model -> DynamicImage -> Either String DynamicImage
+waifu2x model dimg = do
+  img <- case toImageYCbCr8 dimg of
+           Nothing -> Left $ "Unsupported image type: " ++ showImageType dimg
+           Just a -> Right a
+  model' <- validateModel model
+  let img' =  waifu2xMain model' img
+  return $ ImageYCbCr8 img'
+
+validateModel :: Model -> Either String Model
+validateModel model =
+  if length model > 1
+  then Right model
+  else Left $ "invalid number of steps: " ++ show (length model)
+
+waifu2xMain :: Model -> Image PixelYCbCr8 -> Image PixelYCbCr8
+waifu2xMain model img = img' where
+  img' = doubleImageNN img
 
 --
 -- Frontend
@@ -88,13 +124,16 @@ convMain mPath iPath oPath = do
   model <- readModel mPath
   dumpModel model
   Right (dimg, md) <- readImageWithMetadata iPath
-  dumpImageInfo dimg md
-  let dimg' = waifu2x model dimg
-  savePngImage oPath dimg'
+  dumpImageInfo "Input Image" dimg md
+  dumpTitle "Processing"
+  let result = waifu2x model dimg
+  case result of Left s -> putStrLn $ "ERROR: " ++ s
+                 Right dimg' -> do savePngImage oPath dimg'
+                                   dumpImageInfo "Output Image" dimg' md
 
-dumpImageInfo :: DynamicImage -> Metadatas -> IO ()
-dumpImageInfo dimg md = do
-  putStrLn "== Input Image =="
+dumpImageInfo :: String -> DynamicImage -> Metadatas -> IO ()
+dumpImageInfo title dimg md = do
+  dumpTitle title
   dump "width" (dynamicMap imageWidth dimg)
   dump "height" (dynamicMap imageHeight dimg)
   dump "image type" (showImageType dimg)
@@ -102,19 +141,19 @@ dumpImageInfo dimg md = do
 
 showImageType :: DynamicImage -> String
 showImageType = f where
-  f (ImageY8 _) = "ImageY8"
-  f (ImageY16 _) = "ImageY16"
-  f (ImageYF _) = "ImageYF"
-  f (ImageYA8 _) = "ImageYA8"
-  f (ImageYA16 _) = "ImageYA16"
-  f (ImageRGB8 _) = "ImageRGB8"
-  f (ImageRGB16 _) = "ImageRGB16"
-  f (ImageRGBF _) = "ImageRGBF"
-  f (ImageRGBA8 _) = "ImageRGBA8"
-  f (ImageRGBA16 _) = "ImageRGBA16"
-  f (ImageYCbCr8 _) = "ImageYCbCr8"
-  f (ImageCMYK8 _) = "ImageCMYK8"
-  f (ImageCMYK16 _) = "ImageCMYK16"
+  f (ImageY8 _) = "Y8"
+  f (ImageY16 _) = "Y16"
+  f (ImageYF _) = "YF"
+  f (ImageYA8 _) = "YA8"
+  f (ImageYA16 _) = "YA16"
+  f (ImageRGB8 _) = "RGB8"
+  f (ImageRGB16 _) = "RGB16"
+  f (ImageRGBF _) = "RGBF"
+  f (ImageRGBA8 _) = "RGBA8"
+  f (ImageRGBA16 _) = "RGBA16"
+  f (ImageYCbCr8 _) = "YCbCr8"
+  f (ImageCMYK8 _) = "CMYK8"
+  f (ImageCMYK16 _) = "CMYK16"
 
 -- deriving instance Generic DynamicImage
 
@@ -133,7 +172,7 @@ conName = show . toConstr
 main :: IO ()
 main = do
   [mPath, iPath, oPath] <- getArgs
-  putStrLn "== Paths =="
+  dumpTitle "Paths"
   dump "model path" mPath
   dump "input path" iPath
   dump "output path" oPath

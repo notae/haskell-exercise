@@ -40,6 +40,8 @@ Executable waifu2x
   -- Other-Modules:
   GHC-Options:          -Wall -O2
   build-depends:       base
+                     , transformers
+                     , mtl
                      , JuicyPixels
                      , lens
                      , aeson
