@@ -21,6 +21,28 @@ import Codec.Picture
 import Codec.Picture.Types
 import Control.Lens
 import Data.Aeson
+import Data.Aeson.TH
+
+
+type Model = [Step]
+
+data Step =
+  Step
+  { _nInputPlane  :: Int
+  , _nOutputPlane :: Int
+  , _weight       :: [[Kernel]]   -- ^ nOutputPlane * nInputPlane * (3*3)
+  , _bias         :: [Float]      -- ^ nOutputPlane
+  , _kW           :: Int
+  , _kH           :: Int
+  } deriving (Show, Generic)
+
+type Kernel = [[Float]]
+
+deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''Step
+-- instance FromJSON Step
+-- instance ToJSON Step
+
+makeLenses ''Step
 
 main :: IO ()
 main = do
@@ -46,28 +68,11 @@ readModel path = do
 
 dumpModel :: Model -> IO ()
 dumpModel model = do
-  putStrLn $ "model steps: " ++ show (length model)
+  putStrLn $ "model steps: " ++ (length model & show)
   mapM_ dumpStep model
 
 dumpStep :: Step -> IO ()
 dumpStep step = do
   putStrLn "== Step =="
-  putStrLn $ "nInputPlane: " ++ show (nInputPlane step)
-  putStrLn $ "nOutputPlane: " ++ show (nOutputPlane step)
-
-type Model = [Step]
-
-data Step =
-  Step
-  { nInputPlane  :: Int
-  , nOutputPlane :: Int
-  , weight       :: [[Kernel]]   -- ^ nOutputPlane * nInputPlane * (3*3)
-  , bias         :: [Float]      -- ^ nOutputPlane
-  , kW           :: Int
-  , kH           :: Int
-  } deriving (Show, Generic)
-
-instance FromJSON Step
-instance ToJSON Step
-
-type Kernel = [[Float]]
+  putStrLn $ "nInputPlane: " ++ (step ^. nInputPlane & show)
+  putStrLn $ "nOutputPlane: " ++ (step ^. nOutputPlane & show)
