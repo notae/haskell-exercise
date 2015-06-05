@@ -101,19 +101,37 @@ waifu2x model dimg = do
   img <- case toImageYCbCr8 dimg of
            Nothing -> Left $ "Unsupported image type: " ++ showImageType dimg
            Just a -> Right a
-  model' <- validateModel model
+  model' <- checkModel model
   let img' =  waifu2xMain model' img
   return $ ImageYCbCr8 img'
 
-validateModel :: Model -> Either String Model
-validateModel model =
-  if length model > 1
-  then Right model
-  else Left $ "invalid number of steps: " ++ show (length model)
+checkModel :: Model -> Either String Model
+checkModel model = checkLength model >>= checkNOutputPlane where
+  checkLength m =
+    if l > 1
+    then Right m
+    else Left $ "invalid number of steps: " ++ show l
+    where l = length m
+  checkNOutputPlane m =
+    if nop == 1
+    then Right m
+    else Left $ "invalid number of output planes: " ++ show nop
+    where nop = last m ^. nOutputPlane
 
 waifu2xMain :: Model -> Image PixelYCbCr8 -> Image PixelYCbCr8
 waifu2xMain model img = img' where
-  img' = doubleImageNN img
+  img2x = doubleImageNN img
+  yf, yf' :: Image PixelF
+  yf = promoteImage (extractLumaPlane img2x)
+  -- TBD: process yf with model
+  yf' = yf
+  y8' :: Image (PixelBaseComponent PixelYCbCr8)
+  y8' = pixelMap (\y -> ceiling (y * 255)) yf'
+  img' = pixelMapXY f img2x where
+    f :: Int -> Int -> PixelYCbCr8 -> PixelYCbCr8
+    f x y p = setY p (pixelAt y8' x y)
+    setY :: PixelYCbCr8 -> (PixelBaseComponent PixelYCbCr8) -> PixelYCbCr8
+    setY (PixelYCbCr8 _ cb cr) py = PixelYCbCr8 py cb cr
 
 --
 -- Frontend
