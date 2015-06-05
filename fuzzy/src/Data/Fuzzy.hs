@@ -28,6 +28,7 @@ module Data.Fuzzy
        ) where
 
 import           Control.Arrow       (first)
+import           Data.List           (foldl')
 import qualified Data.List           as List
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
@@ -36,7 +37,6 @@ import           Data.Ratio          ((%))
 import           Data.Set            (Set)
 import qualified Data.Set            as Set
 import           Text.Show.Functions ()
-import Data.List (foldl')
 
 class Fuzzy a where
   -- | And (Intersection)
