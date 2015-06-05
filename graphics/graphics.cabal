@@ -20,9 +20,7 @@ library
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base
-                     , array
                      , JuicyPixels
-                     , lens
   -- hs-source-dirs:      
   default-language:    Haskell2010
 
@@ -35,3 +33,16 @@ Executable conv
                      , array
                      , JuicyPixels
                      , lens
+
+Executable waifu2x
+  Default-Language:     Haskell2010
+  Main-Is:              Waifu2x.hs
+  -- Other-Modules:
+  GHC-Options:          -Wall -O2
+  build-depends:       base
+                     , JuicyPixels
+                     , lens
+                     , aeson
+                     , bytestring
+                     , array
+                     , vector
