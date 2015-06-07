@@ -211,7 +211,7 @@ waifu2xMain model img = img' where
 
   -- post-process
   y8' :: Image (PixelBaseComponent PixelYCbCr8)
-  y8' = pixelMap (clamp 0 255 . floor . (* 255)) (head yf')
+  y8' = pixelMap (floor . (* 255) . clamp 0 1) (head yf')
   img' = pixelMapXY f img2x where
     f :: Int -> Int -> PixelYCbCr8 -> PixelYCbCr8
     f x y p = setY p (pixelAt y8' x y)
