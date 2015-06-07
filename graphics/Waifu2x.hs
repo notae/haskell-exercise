@@ -13,11 +13,12 @@ Waifu2x.hs based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/maste
 module Main where
 
 import           Control.Applicative
+import           Control.DeepSeq (force)
 import qualified Data.ByteString.Lazy as B
 import           Data.Data            (Data, Typeable, toConstr)
 import           Data.Either
 import           Data.List            (foldl', foldl1')
-import           Debug.Trace          (traceShow)
+import           Debug.Trace          (trace, traceShow)
 import           GHC.Generics         (Generic)
 import           System.Environment   (getArgs)
 
@@ -41,6 +42,8 @@ dump name val = putStrLn $ name ++ ": " ++ show val
 --
 -- Model
 --
+
+type Plane = Image PixelF
 
 type Model = [Step]
 
@@ -80,7 +83,7 @@ dumpStep step = do
   dump "kW, kH" (step ^. kW, step ^. kH)
 
 --
--- Image
+-- Image Operations
 --
 
 toImageYCbCr8 :: DynamicImage -> Maybe (Image PixelYCbCr8)
@@ -121,6 +124,33 @@ getDynamicImageSize dimg = (w, h) where
   w = dynamicMap imageWidth  dimg
   h = dynamicMap imageHeight dimg
 
+-- plane operations
+cutNeg :: Plane -> Plane
+cutNeg = pixelMap $ \y -> max y 0 + 0.1 * min y 0
+
+convolute :: Kernel -> Plane -> Plane
+convolute k p = p' where
+  (w, h) = getImageSize p
+  (w', h') = (w - 2, h - 2)
+  p' = generateImage f w' h'
+  f'' x y = pixelAt p (x+1) (y+1) * 0.99
+  f' x y = traceShow (x, y, f x y) (f x y)
+  f x y = sum $ fmap gy (zip k [0..]) where
+    gy :: ([PixelF], Int) -> PixelF
+    gy (kl, ky) = sum $ fmap gx (zip3 kl (repeat ky) [0..]) where
+    gx :: (PixelF, Int, Int) -> PixelF
+    gx (kp, ky, kx) = pixelAt p (x+kx) (y+ky) * kp
+
+sumP :: [Plane] -> Plane
+sumP [] = error "sumP: empty list"
+sumP ps@(p0:_) = s where
+  (w, h) = getImageSize p0
+  s = generateImage f w h
+  f x y = sum (fmap (\p -> pixelAt p x y) ps)
+
+addBias :: Float -> Plane -> Plane
+addBias b = pixelMap (+b)
+
 --
 -- Waifu2x Core
 --
@@ -149,8 +179,6 @@ checkModel model = checkLength model >>= checkNOutputPlane
     where nop = last m ^. nOutputPlane
   -- TBD: more check
 
-type Plane = Image PixelF
-
 waifu2xMain :: Model -> Image PixelYCbCr8 -> Image PixelYCbCr8
 waifu2xMain model img = img' where
   -- pre-process
@@ -164,39 +192,22 @@ waifu2xMain model img = img' where
 
   -- main process
   yf' :: [Plane]
-  yf' = foldl' procStep planes0 model where
-    procStep :: [Plane] -> Step -> [Plane]
-    procStep inPlanes step =
+  yf' = foldl' procStep planes0 (zip model [0..]) where
+    procStep :: [Plane] -> (Step, Int) -> [Plane]
+    procStep inPlanes (step, i) |
+      trace ("procStep: " ++ show i ++ "," ++
+             show (length (force (inPlanes))) ++ "," ++
+             show (step ^. nInputPlane) ++ "," ++
+             show (step ^. nOutputPlane) ++ "," ++
+             show (length (step ^. weight)))
+      False = undefined
+    procStep inPlanes (step, _) =
       zipWith procOutPlane (step ^. weight) (step ^. bias) where
         procOutPlane :: [Kernel] -> Bias -> Plane
+        procOutPlane ws b |
+          trace ("procOutPlane: " ++ show (length ws)) False = undefined
         procOutPlane ws b = cutNeg . addBias b . sumP $
                             zipWith convolute ws inPlanes
-
-  -- plane operations
-  cutNeg :: Plane -> Plane
-  cutNeg = pixelMap $ \y -> max y 0 + 0.1 * min y 0
-  convolute :: Kernel -> Plane -> Plane
-  convolute k p = p' where
-    (w, h) = getImageSize p
-    (w', h') = (w - 2, h - 2)
-    p' = generateImage f w' h'
-    f'' x y = pixelAt p (x+1) (y+1)
-    f' x y = traceShow (x, y, f x y) (f x y)
-    f x y = sum $ fmap gx (zip k [0..]) where
-      gx :: ([PixelF], Int) -> PixelF
-      gx (kl, kx) = sum $ fmap gy (zip3 kl (repeat kx) [0..]) where
-      gy :: (PixelF, Int, Int) -> PixelF
-      -- gy (kp, kx, ky) | traceShow (kp, kx, ky) False = undefined
-      gy (kp, kx, ky) = pixelAt p (x+kx) (y+ky) * kp
-  sumP :: [Plane] -> Plane
-  sumP [] = error "sumP: empty list"
-  sumP ps@(p0:_) = s where
-    (w, h) = getImageSize p0
-    s = generateImage f w h
-    f x y = sum (fmap (\p -> pixelAt p x y) ps) /
-            (fromInteger . toInteger . length) ps
-  addBias :: Float -> Plane -> Plane
-  addBias b = pixelMap (+b)
 
   -- post-process
   y8' :: Image (PixelBaseComponent PixelYCbCr8)

@@ -49,3 +49,4 @@ Executable waifu2x
                      , bytestring
                      , array
                      , vector
+                     , deepseq
