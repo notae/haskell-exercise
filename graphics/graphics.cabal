@@ -42,6 +42,7 @@ Executable waifu2x
   build-depends:       base
                      , transformers
                      , mtl
+                     , monad-journal
                      , JuicyPixels
                      , lens
                      , aeson
