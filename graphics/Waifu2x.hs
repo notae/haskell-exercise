@@ -1,5 +1,6 @@
 {-
-Waifu2x.hs based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/master/appendix/waifu2x-commented.py
+Waifu2x.hs by @notae_c based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/master/appendix/waifu2x-commented.py
+MIT license, see https://github.com/nagadomi/waifu2x/blob/master/LICENSE
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -12,12 +13,10 @@ Waifu2x.hs based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/maste
 
 module Main where
 
-import           Control.Applicative
 import           Control.DeepSeq      (force)
 import qualified Data.ByteString.Lazy as B
-import           Data.Data            (Data, Typeable, toConstr)
 import           Data.Either
-import           Data.List            (foldl', foldl1')
+import           Data.List            (foldl')
 import           Debug.Trace          (trace, traceShow)
 import           GHC.Generics         (Generic)
 import           System.Environment   (getArgs)
@@ -258,20 +257,6 @@ showImageType = f where
   f (ImageYCbCr8 _) = "YCbCr8"
   f (ImageCMYK8 _) = "CMYK8"
   f (ImageCMYK16 _) = "CMYK16"
-
--- deriving instance Generic DynamicImage
-
--- deriving instance Typeable DynamicImage
--- deriving instance Data DynamicImage
-
--- showDynamicImageType :: DynamicImage -> String
--- showDynamicImageType = conName
-
--- conName :: G.Constructor c => G.M1 i c f p -> String
--- conName m1 = G.conName m1
-
-conName :: Data a  => a -> String
-conName = show . toConstr
 
 main :: IO ()
 main = do
