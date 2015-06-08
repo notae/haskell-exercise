@@ -13,7 +13,7 @@ Waifu2x.hs based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/maste
 module Main where
 
 import           Control.Applicative
-import           Control.DeepSeq (force)
+import           Control.DeepSeq      (force)
 import qualified Data.ByteString.Lazy as B
 import           Data.Data            (Data, Typeable, toConstr)
 import           Data.Either
@@ -137,7 +137,7 @@ convolute k p = p' where
   f' x y = traceShow (x, y, f x y) (f x y)
   f x y = sum $ fmap gy (zip k [0..]) where
     gy :: ([PixelF], Int) -> PixelF
-    gy (kl, ky) = sum $ fmap gx (zip3 kl (repeat ky) [0..]) where
+    gy (kl, ky) = sum $ fmap gx (zip3 kl (repeat ky) [0..])
     gx :: (PixelF, Int, Int) -> PixelF
     gx (kp, ky, kx) = pixelAt p (x+kx) (y+ky) * kp
 
@@ -196,7 +196,7 @@ waifu2xMain model img = img' where
     procStep :: [Plane] -> (Step, Int) -> [Plane]
     procStep inPlanes (step, i) |
       trace ("procStep: " ++ show i ++ "," ++
-             show (length (force (inPlanes))) ++ "," ++
+             show (length (force inPlanes)) ++ "," ++
              show (step ^. nInputPlane) ++ "," ++
              show (step ^. nOutputPlane) ++ "," ++
              show (length (step ^. weight)))
