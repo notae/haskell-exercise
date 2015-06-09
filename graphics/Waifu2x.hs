@@ -15,9 +15,8 @@ module Main where
 
 import           Control.DeepSeq      (force)
 import qualified Data.ByteString.Lazy as B
-import           Data.Either
 import           Data.List            (foldl')
-import           Debug.Trace          (trace, traceShow)
+import           Debug.Trace          (trace)
 import           GHC.Generics         (Generic)
 import           System.Environment   (getArgs)
 
@@ -50,8 +49,8 @@ data Step =
   Step
   { _nInputPlane  :: Int
   , _nOutputPlane :: Int
-  , _weight       :: [[Kernel]]   -- ^ nOutputPlane * nInputPlane * (3*3)
-  , _bias         :: [Bias]      -- ^ nOutputPlane
+  , _weight       :: [[Kernel]] -- ^ nOutputPlane * nInputPlane * (kW*kH)
+  , _bias         :: [Bias]     -- ^ nOutputPlane
   , _kW           :: Int
   , _kH           :: Int
   } deriving (Show, Generic)
@@ -93,16 +92,13 @@ toImageYCbCr8 dimg = case dimg of
   _ -> Nothing
 
 doubleImageNN :: Pixel a => Image a -> Image a
-doubleImageNN src = dst where
-  w = imageWidth src
-  h = imageHeight src
-  dst = generateImage f (w * 2) (h * 2)
+doubleImageNN src = generateImage f (w * 2) (h * 2) where
+  (w, h) = getImageSize src
   f x y = pixelAt src (x `div` 2) (y `div` 2)
 
 padEdge :: Pixel a => Int -> Image a -> Image a
-padEdge n img = img' where
+padEdge n img = generateImage f (w + n * 2) (h + n * 2) where
   (w, h) = getImageSize img
-  img' = generateImage f (w + n * 2) (h + n * 2)
   f x y = pixelAt img x' y' where
     x' = clamp n (n + w - 1) x - n
     y' = clamp n (n + h - 1) y - n
@@ -115,21 +111,15 @@ clamp :: Ord a => a -> a -> a -> a
 clamp l h = min h . max l
 
 getImageSize :: Image a -> (Int, Int)
-getImageSize dimg = (w, h) where
-  w = imageWidth  dimg
-  h = imageHeight dimg
+getImageSize dimg = (imageWidth  dimg, imageHeight dimg)
 
--- plane operations
 cutNeg :: Plane -> Plane
 cutNeg = pixelMap $ \y -> max y 0 + 0.1 * min y 0
 
 convolute :: Kernel -> Plane -> Plane
-convolute k p = p' where
+convolute k p = generateImage f w' h' where
   (w, h) = getImageSize p
   (w', h') = (w - 2, h - 2)
-  p' = generateImage f w' h'
-  f'' x y = pixelAt p (x+1) (y+1) * 0.99
-  f' x y = traceShow (x, y, f x y) (f x y)
   f x y = sum $ fmap gy (zip k [0..]) where
     gy :: ([PixelF], Int) -> PixelF
     gy (kl, ky) = sum $ fmap gx (zip3 kl (repeat ky) [0..])
@@ -137,10 +127,8 @@ convolute k p = p' where
     gx (kp, ky, kx) = pixelAt p (x+kx) (y+ky) * kp
 
 sumP :: [Plane] -> Plane
-sumP [] = error "sumP: empty list"
-sumP ps@(p0:_) = s where
-  (w, h) = getImageSize p0
-  s = generateImage f w h
+sumP ps = generateImage f w h where
+  (w, h) = getImageSize (head ps)
   f x y = sum (fmap (\p -> pixelAt p x y) ps)
 
 addBias :: Float -> Plane -> Plane
@@ -178,40 +166,38 @@ waifu2xMain :: Model -> Image PixelYCbCr8 -> Image PixelYCbCr8
 waifu2xMain model img = img' where
   -- pre-process
   img2x = doubleImageNN img
-  yf :: Plane
   yf = promoteImage (extractLumaPlane img2x)
-  planes0 :: [Plane]
   planes0 = [padEdge (length model) yf]
-  count = sum [step ^. nInputPlane * step ^. nOutputPlane | step <- model]
+  -- count = sum [step ^. nInputPlane * step ^. nOutputPlane | step <- model]
   -- TBD: progress in StateT
 
   -- main process
-  yf' :: [Plane]
   yf' = foldl' procStep planes0 (zip model [0..]) where
     procStep :: [Plane] -> (Step, Int) -> [Plane]
-    procStep inPlanes (step, i) |
-      trace ("procStep: " ++ show i ++ "," ++
-             show (length (force inPlanes)) ++ "," ++
-             show (step ^. nInputPlane) ++ "," ++
-             show (step ^. nOutputPlane) ++ "," ++
-             show (length (step ^. weight)))
-      False = undefined
+    procStep inPlanes (step, i) | traceStep inPlanes (step, i) = undefined
     procStep inPlanes (step, _) =
-      zipWith procOutPlane (step ^. weight) (step ^. bias) where
-        procOutPlane :: [Kernel] -> Bias -> Plane
-        procOutPlane ws b |
-          trace ("procOutPlane: " ++ show (length ws)) False = undefined
-        procOutPlane ws b = cutNeg . addBias b . sumP $
-                            zipWith convolute ws inPlanes
+      zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
+        procOutPlane :: [Kernel] -> Float -> Int -> Plane
+        procOutPlane ws _ j | traceOutPlane ws j = undefined
+        procOutPlane ws b _ = cutNeg . addBias b . sumP $
+                              zipWith convolute ws inPlanes
 
   -- post-process
-  y8' :: Image (PixelBaseComponent PixelYCbCr8)
   y8' = pixelMap (floor . (* 255) . clamp 0 1) (head yf')
   img' = pixelMapXY f img2x where
-    f :: Int -> Int -> PixelYCbCr8 -> PixelYCbCr8
     f x y p = setY p (pixelAt y8' x y)
-    setY :: PixelYCbCr8 -> PixelBaseComponent PixelYCbCr8 -> PixelYCbCr8
     setY (PixelYCbCr8 _ cb cr) py = PixelYCbCr8 py cb cr
+
+  -- trace output
+  traceStep inPlanes (step, i) =
+    trace ("procStep: " ++ show i ++ "," ++
+           show (length (force inPlanes)) ++ "," ++
+           show (step ^. nInputPlane) ++ "," ++
+           show (step ^. nOutputPlane) ++ "," ++
+           show (length (step ^. weight)))
+          False
+  traceOutPlane ws j =
+    trace ("procOutPlane: " ++ show j ++ "/" ++ show (length ws)) False
 
 --
 -- Frontend
