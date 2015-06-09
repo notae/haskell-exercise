@@ -89,6 +89,7 @@ toImageYCbCr8 :: DynamicImage -> Maybe (Image PixelYCbCr8)
 toImageYCbCr8 dimg = case dimg of
   ImageYCbCr8 img -> Just img
   ImageRGB8 img -> Just $ convertImage img
+  ImageRGBA8 img -> Just $ convertImage $ pixelMap dropTransparency img
   _ -> Nothing
 
 doubleImageNN :: Pixel a => Image a -> Image a
@@ -117,11 +118,6 @@ getImageSize :: Image a -> (Int, Int)
 getImageSize dimg = (w, h) where
   w = imageWidth  dimg
   h = imageHeight dimg
-
-getDynamicImageSize :: DynamicImage -> (Int, Int)
-getDynamicImageSize dimg = (w, h) where
-  w = dynamicMap imageWidth  dimg
-  h = dynamicMap imageHeight dimg
 
 -- plane operations
 cutNeg :: Plane -> Plane
@@ -236,7 +232,7 @@ convMain mPath iPath oPath = do
 dumpImageInfo :: String -> DynamicImage -> Metadatas -> IO ()
 dumpImageInfo title dimg md = do
   dumpTitle title
-  let (w, h) = getDynamicImageSize dimg
+  let (w, h) = dynamicMap getImageSize dimg
   dump "width" w
   dump "height" h
   dump "image type" (showImageType dimg)
