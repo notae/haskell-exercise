@@ -14,6 +14,8 @@ MIT license, see https://github.com/nagadomi/waifu2x/blob/master/LICENSE
 module Main where
 
 import           Control.DeepSeq      (force)
+import qualified Data.Array.IArray    as A
+import qualified Data.Array.Unboxed   as A
 import qualified Data.ByteString.Lazy as B
 import           Data.List            (foldl')
 import           Debug.Trace          (trace)
@@ -120,11 +122,11 @@ convolute :: Kernel -> Plane -> Plane
 convolute k p = generateImage f w' h' where
   (w, h) = getImageSize p
   (w', h') = (w - 2, h - 2)
-  f x y = sum $ fmap gy (zip k [0..]) where
-    gy :: ([PixelF], Int) -> PixelF
-    gy (kl, ky) = sum $ fmap gx (zip3 kl (repeat ky) [0..])
-    gx :: (PixelF, Int, Int) -> PixelF
-    gx (kp, ky, kx) = pixelAt p (x+kx) (y+ky) * kp
+  (kw, kh) = (length (head k), length k)
+  ary :: A.UArray (Int, Int) Float
+  ary = A.listArray ((0, 0), (kw-1, kh-1)) (concat k)
+  f x y = sum $ fmap (g x y) (A.assocs ary)
+  g x y ((kx, ky), e) = pixelAt p (x+kx) (y+ky) * e
 
 sumP :: [Plane] -> Plane
 sumP ps = generateImage f w h where
@@ -178,7 +180,7 @@ waifu2xMain model img = img' where
     procStep inPlanes (step, _) =
       zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
         procOutPlane :: [Kernel] -> Float -> Int -> Plane
-        procOutPlane ws _ j | traceOutPlane ws j = undefined
+        procOutPlane _ _ j | traceOutPlane step j = undefined
         procOutPlane ws b _ = cutNeg . addBias b . sumP $
                               zipWith convolute ws inPlanes
 
@@ -196,8 +198,8 @@ waifu2xMain model img = img' where
            show (step ^. nOutputPlane) ++ "," ++
            show (length (step ^. weight)))
           False
-  traceOutPlane ws j =
-    trace ("procOutPlane: " ++ show j ++ "/" ++ show (length ws)) False
+  traceOutPlane step j =
+    trace ("procOutPlane: " ++ show j ++ "/" ++ show (step ^. nOutputPlane)) False
 
 --
 -- Frontend
