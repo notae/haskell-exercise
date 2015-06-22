@@ -3,88 +3,28 @@ Waifu2x.hs by @notae_c based on https://github.com/WL-Amigo/waifu2x-converter-cp
 MIT license, see https://github.com/nagadomi/waifu2x/blob/master/LICENSE
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedLists    #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
-
 module Main where
 
-import           Control.DeepSeq      (force)
-import qualified Data.Array.IArray    as A
-import qualified Data.Array.Unboxed   as A
-import qualified Data.ByteString.Lazy as B
-import           Data.List            (foldl')
-import           Debug.Trace          (trace)
-import           GHC.Generics         (Generic)
-import           System.Environment   (getArgs)
+import           Control.DeepSeq    (force)
+import qualified Data.Array.IArray  as A
+import qualified Data.Array.Unboxed as A
+import           Data.List          (foldl')
+import           Debug.Trace        (trace)
+import           System.Environment (getArgs)
 
 import Codec.Picture
-import Codec.Picture.Metadata (Metadatas)
 import Codec.Picture.Types
+
 import Control.Lens
-import Data.Aeson
-import Data.Aeson.TH
 
---
--- Utils
---
-
-dumpTitle :: String -> IO ()
-dumpTitle name = putStrLn $ "== " ++ name ++ " =="
-
-dump :: Show a => String -> a -> IO ()
-dump name val = putStrLn $ name ++ ": " ++ show val
-
---
--- Model
---
-
-type Plane = Image PixelF
-
-type Model = [Step]
-
-data Step =
-  Step
-  { _nInputPlane  :: Int
-  , _nOutputPlane :: Int
-  , _weight       :: [[Kernel]] -- ^ nOutputPlane * nInputPlane * (kW*kH)
-  , _bias         :: [Bias]     -- ^ nOutputPlane
-  , _kW           :: Int
-  , _kH           :: Int
-  } deriving (Show, Generic)
-
-type Kernel = [[Float]]
-type Bias = Float
-
-deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''Step
-
-makeLenses ''Step
-
-readModel :: FilePath -> IO Model
-readModel path = do
-  json_bytes <- B.readFile path
-  let (Just model) = decode' json_bytes
-  return model
-
-dumpModel :: Model -> IO ()
-dumpModel model = do
-  dump "model steps" (length model)
-  mapM_ dumpStep model
-
-dumpStep :: Step -> IO ()
-dumpStep step = do
-  dumpTitle "Step"
-  dump "nInputPlane" (step ^. nInputPlane)
-  dump "nOutputPlane" (step ^. nOutputPlane)
-  dump "kW, kH" (step ^. kW, step ^. kH)
+import Common
+import Model
 
 --
 -- Image Operations
 --
+
+type Plane = Image PixelF
 
 toImageYCbCr8 :: DynamicImage -> Maybe (Image PixelYCbCr8)
 toImageYCbCr8 dimg = case dimg of
@@ -104,16 +44,6 @@ padEdge n img = generateImage f (w + n * 2) (h + n * 2) where
   f x y = pixelAt img x' y' where
     x' = clamp n (n + w - 1) x - n
     y' = clamp n (n + h - 1) y - n
-
-{-|
->>> fmap (clamp 2 5) [0, 3, 7]
-[2,3,5]
--}
-clamp :: Ord a => a -> a -> a -> a
-clamp l h = min h . max l
-
-getImageSize :: Image a -> (Int, Int)
-getImageSize dimg = (imageWidth  dimg, imageHeight dimg)
 
 cutNeg :: Plane -> Plane
 cutNeg = pixelMap $ \y -> max y 0 + 0.1 * min y 0
@@ -216,31 +146,6 @@ convMain mPath iPath oPath = do
   case result of Left s -> putStrLn $ "ERROR: " ++ s
                  Right dimg' -> do savePngImage oPath dimg'
                                    dumpImageInfo "Output Image" dimg' md
-
-dumpImageInfo :: String -> DynamicImage -> Metadatas -> IO ()
-dumpImageInfo title dimg md = do
-  dumpTitle title
-  let (w, h) = dynamicMap getImageSize dimg
-  dump "width" w
-  dump "height" h
-  dump "image type" (showImageType dimg)
-  dump "metadata" md
-
-showImageType :: DynamicImage -> String
-showImageType = f where
-  f (ImageY8 _) = "Y8"
-  f (ImageY16 _) = "Y16"
-  f (ImageYF _) = "YF"
-  f (ImageYA8 _) = "YA8"
-  f (ImageYA16 _) = "YA16"
-  f (ImageRGB8 _) = "RGB8"
-  f (ImageRGB16 _) = "RGB16"
-  f (ImageRGBF _) = "RGBF"
-  f (ImageRGBA8 _) = "RGBA8"
-  f (ImageRGBA16 _) = "RGBA16"
-  f (ImageYCbCr8 _) = "YCbCr8"
-  f (ImageCMYK8 _) = "CMYK8"
-  f (ImageCMYK16 _) = "CMYK16"
 
 main :: IO ()
 main = do
