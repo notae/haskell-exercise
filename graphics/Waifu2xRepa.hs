@@ -12,7 +12,7 @@ https://github.com/nagadomi/waifu2x/tree/master/models/anime_style_art_rgb
 module Main where
 
 import Data.Functor.Identity
-import Data.List             (foldl', foldl1')
+import Data.List             (foldl')
 import Data.Word
 import Debug.Trace           (trace)
 import System.Environment    (getArgs)
@@ -98,7 +98,7 @@ waifu2xMain model src = dest where
   dest :: Array F DIM3 Word8
   dest = runIdentity $ R.computeP $ mergeChs $ map (f . clip) planesN where
     clip :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Word8
-    clip ch = R.map (floor . (* 255) . clamp 0 1) ch
+    clip = R.map (floor . (* 255) . clamp 0 1)
     f :: (Source s Word8) => Array s DIM2 Word8 -> Array D DIM3 Word8
     f ch = R.reshape (R.extent ch :. (1::Int)) ch
     mergeChs :: (Source s Word8) => [Array s DIM3 Word8] -> Array D DIM3 Word8
@@ -108,7 +108,7 @@ waifu2xMain model src = dest where
   -- trace output
   traceStep inPlanes (step, i) =
     trace ("procStep: " ++ show i ++ "," ++
-           show (length (inPlanes)) ++ "," ++
+           show (length inPlanes) ++ "," ++
            show (step ^. nInputPlane) ++ "," ++
            show (step ^. nOutputPlane) ++ "," ++
            show (length (step ^. weight)))
@@ -192,13 +192,6 @@ addBias b = R.map (+ b)
 
 cutNeg :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Float
 cutNeg = R.map $ \y -> max y 0 + 0.1 * min y 0
-
-sumP' :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
-sumP' = runIdentity . R.sumP . mergeChs . map f where
-  f :: (Source s Float) => Array s DIM2 Float -> Array D DIM3 Float
-  f ch = R.reshape (R.extent ch :. (1::Int)) ch
-  mergeChs :: [Array D DIM3 a] -> Array D DIM3 a
-  mergeChs = foldl1' (R.++)
 
 sumP :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
 sumP ps = runIdentity $ R.sumP $ R.fromFunction (sh :. l) f where
