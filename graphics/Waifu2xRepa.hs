@@ -12,7 +12,7 @@ https://github.com/nagadomi/waifu2x/tree/master/models/anime_style_art_rgb
 module Main where
 
 import Data.Functor.Identity
-import Data.List             (foldl')
+import Data.List             (foldl', foldl1')
 import Data.Word
 import Debug.Trace           (trace)
 import System.Environment    (getArgs)
@@ -72,19 +72,15 @@ waifu2xMain model src = dest where
   img8ToF = R.map ((/ 255) . fromRational . toRational)
   src2x :: Array D DIM3 Word8
   src2x = doubleImageNN src
-  -- Z :. _ :. _ :. k = R.extent src2x
-  -- planes0 :: Array U DIM3 Float
-  -- planes0 = runIdentity $ R.computeP $ padEdge3 (length model) $ doubleImageNN $ img8ToF src
   planes0 :: [Array U DIM2 Float]
   planes0 = map preProcessCh [0..k-1] where
     Z :. _ :. _ :. k = R.extent src
     preProcessCh :: Int -> Array U DIM2 Float
-    preProcessCh = runIdentity . R.computeP . img8ToF . padEdge (length model) . splitChs
+    preProcessCh = runIdentity . R.computeP . img8ToF . splitChs
     splitChs :: Int -> Array D DIM2 Word8
     splitChs c = R.slice src2x (Any :. (c::Int))
 
   -- main process
-  --
   planesN :: [Array U DIM2 Float]
   planesN = foldl' procStep planes0 (zip model [0..]) where
     procStep :: (Source s Float) => [Array s DIM2 Float] -> (Step, Int) -> [Array U DIM2 Float]
@@ -97,17 +93,9 @@ waifu2xMain model src = dest where
                               cutNeg . addBias b . sumP $
                               zipWith convolve ws inPlanes
 
-    -- procStep inPlanes (step, _) = runIdentity $ R.computeP $
-    --   zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
-    --     procOutPlane :: [Kernel] -> Float -> Int -> Array D DIM3 Float
-    --     procOutPlane _ _ j | traceOutPlane step j = undefined
-    --     procOutPlane ws b _ = cutNeg . addBias b . R.sumP $
-    --                           convolute ws inPlanes
-
   -- post-process
   dest :: Array F DIM3 Word8
   dest = runIdentity $ R.computeP $ mergeChs $ map (f . clip) planesN where
-  -- dest = runIdentity $ R.computeP $ clip planesN where
     clip :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Word8
     clip ch = R.map (floor . (* 255) . clamp 0 1) ch
     f :: (Source s Word8) => Array s DIM2 Word8 -> Array D DIM3 Word8
@@ -115,9 +103,6 @@ waifu2xMain model src = dest where
     mergeChs :: (Source s Word8) => [Array s DIM3 Word8] -> Array D DIM3 Word8
     mergeChs [r, g, b] = r R.++ g R.++ b
     mergeChs _ = error "waifu2xMain.g: ERROR: number of elements must be 3"
-    -- mergeChs [] = error "waifu2xMain.g: ERROR: empty list"
-    -- mergeChs [ch] = ch
-    -- mergeChs (ch:chs) = ch R.++ mergeChs chs
 
   -- trace output
   traceStep inPlanes (step, i) =
@@ -212,9 +197,10 @@ sumP = runIdentity . R.sumP . mergeChs . map f where
   f :: (Source s Float) => Array s DIM2 Float -> Array D DIM3 Float
   f ch = R.reshape (R.extent ch :. (1::Int)) ch
   mergeChs :: [Array D DIM3 a] -> Array D DIM3 a
-  mergeChs [] = error "waifu2xMain.sumP.mergeChs: ERROR: empty list"
-  mergeChs [ch] = ch
-  mergeChs (ch:chs) = ch R.++ mergeChs chs
+  mergeChs = foldl1' (R.++)
+  -- mergeChs [] = error "waifu2xMain.sumP.mergeChs: ERROR: empty list"
+  -- mergeChs [ch] = ch
+  -- mergeChs (ch:chs) = ch R.++ mergeChs chs
 
 --
 -- Frontend
