@@ -1,23 +1,30 @@
 {-
 Waifu2xRepa.hs by @notae_c based on https://github.com/WL-Amigo/waifu2x-converter-cpp/blob/master/appendix/waifu2x-commented.py
 MIT license, see https://github.com/nagadomi/waifu2x/blob/master/LICENSE
+
+Use NN Model for RGB:
+https://github.com/nagadomi/waifu2x/tree/master/models/anime_style_art_rgb
 -}
 
+{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module Main where
 
 import Data.Functor.Identity
+import Data.List             (foldl')
 import Data.Word
+import Debug.Trace           (trace)
 import System.Environment    (getArgs)
 
 import Control.Lens
 
-import qualified Data.Array.Repa              as R
-import qualified Data.Array.Repa.Stencil.Dim2 as R
+import qualified Data.Array.Repa                  as R
+import qualified Data.Array.Repa.Specialised.Dim2 as R
+import qualified Data.Array.Repa.Stencil          as R
+import qualified Data.Array.Repa.Stencil.Dim2     as R
 
-import Data.Array.Repa ((:.) (..), All (..), Any (..), Array, D, DIM0, DIM1,
-                        DIM2, DIM3, U, Z (..))
+import Data.Array.Repa ((:.) (..), Any (..), Array, D, DIM2, DIM3, U, Z (..))
 import Data.Array.Repa (Shape, Source)
 
 import Data.Array.Repa.Repr.ForeignPtr (F)
@@ -34,6 +41,22 @@ import Model
 -- Waifu2x Core with Repa
 --
 
+-- type ImgRGB  a = Source r a =>
+--                  Array r DIM3 a
+-- type ImgRGB8   = Array D DIM3 Word8
+-- type ImgRGBF   = Array D DIM3 Float
+
+-- type Img r a = Source r a =>
+--                Array r DIM2 a
+-- type Img8    = Array D DIM2 Word8
+-- type ImgF    = Array D DIM2 Float
+
+-- type PlaneS r = Img r Float
+-- type PlaneU   = Img U Float
+-- type Plane    = ImgF
+
+-- type Filter r = PlaneS r -> Plane
+
 waifu2x :: Model -> DynamicImage -> Either String DynamicImage
 waifu2x model dimg = do
   model' <- checkModel model
@@ -45,30 +68,67 @@ waifu2xMain :: (Source s Word8) =>
                Model -> Array s DIM3 Word8 -> Array F DIM3 Word8
 waifu2xMain model src = dest where
   -- pre-process
-  srcf :: Array D DIM3 Float
-  srcf = R.map ((/ 255) . fromRational . toRational) src
-  src2x :: Array D DIM3 Float
-  src2x = doubleImageNN srcf
-  Z :. _ :. _ :. k = R.extent src2x
+  img8ToF :: (Source s Word8, Shape sh) => Array s sh Word8 -> Array D sh Float
+  img8ToF = R.map ((/ 255) . fromRational . toRational)
+  src2x :: Array D DIM3 Word8
+  src2x = doubleImageNN src
+  -- Z :. _ :. _ :. k = R.extent src2x
+  -- planes0 :: Array U DIM3 Float
+  -- planes0 = runIdentity $ R.computeP $ padEdge3 (length model) $ doubleImageNN $ img8ToF src
   planes0 :: [Array U DIM2 Float]
-  planes0 = map splitChs [0..k-1] where
-    splitChs :: Int -> Array U DIM2 Float
-    splitChs c = runIdentity $ R.computeP $ R.slice src2x (Any :. (c::Int))
+  planes0 = map preProcessCh [0..k-1] where
+    Z :. _ :. _ :. k = R.extent src
+    preProcessCh :: Int -> Array U DIM2 Float
+    preProcessCh = runIdentity . R.computeP . img8ToF . padEdge (length model) . splitChs
+    splitChs :: Int -> Array D DIM2 Word8
+    splitChs c = R.slice src2x (Any :. (c::Int))
 
   -- main process
-  planesN = map (R.map (*0.8)) planes0
-  -- planesN = planes0
+  --
+  planesN :: [Array U DIM2 Float]
+  planesN = foldl' procStep planes0 (zip model [0..]) where
+    procStep :: (Source s Float) => [Array s DIM2 Float] -> (Step, Int) -> [Array U DIM2 Float]
+    procStep inPlanes (step, i) | traceStep inPlanes (step, i) = undefined
+    procStep inPlanes (step, _) =
+      zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
+        procOutPlane :: [Kernel] -> Float -> Int -> Array U DIM2 Float
+        procOutPlane _ _ j | traceOutPlane step j = undefined
+        procOutPlane ws b _ = runIdentity $ R.computeP $
+                              cutNeg . addBias b . sumP $
+                              zipWith convolve ws inPlanes
+
+    -- procStep inPlanes (step, _) = runIdentity $ R.computeP $
+    --   zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
+    --     procOutPlane :: [Kernel] -> Float -> Int -> Array D DIM3 Float
+    --     procOutPlane _ _ j | traceOutPlane step j = undefined
+    --     procOutPlane ws b _ = cutNeg . addBias b . R.sumP $
+    --                           convolute ws inPlanes
 
   -- post-process
+  dest :: Array F DIM3 Word8
   dest = runIdentity $ R.computeP $ mergeChs $ map (f . clip) planesN where
+  -- dest = runIdentity $ R.computeP $ clip planesN where
     clip :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Word8
     clip ch = R.map (floor . (* 255) . clamp 0 1) ch
     f :: (Source s Word8) => Array s DIM2 Word8 -> Array D DIM3 Word8
     f ch = R.reshape (R.extent ch :. (1::Int)) ch
-    mergeChs :: [Array D DIM3 Word8] -> Array D DIM3 Word8
-    mergeChs [] = error "waifu2xMain.g: ERROR: empty list"
-    mergeChs [ch] = ch
-    mergeChs (ch:chs) = ch R.++ mergeChs chs
+    mergeChs :: (Source s Word8) => [Array s DIM3 Word8] -> Array D DIM3 Word8
+    mergeChs [r, g, b] = r R.++ g R.++ b
+    mergeChs _ = error "waifu2xMain.g: ERROR: number of elements must be 3"
+    -- mergeChs [] = error "waifu2xMain.g: ERROR: empty list"
+    -- mergeChs [ch] = ch
+    -- mergeChs (ch:chs) = ch R.++ mergeChs chs
+
+  -- trace output
+  traceStep inPlanes (step, i) =
+    trace ("procStep: " ++ show i ++ "," ++
+           show (length (inPlanes)) ++ "," ++
+           show (step ^. nInputPlane) ++ "," ++
+           show (step ^. nOutputPlane) ++ "," ++
+           show (length (step ^. weight)))
+          False
+  traceOutPlane step j =
+    trace ("procOutPlane: " ++ show j ++ "/" ++ show (step ^. nOutputPlane)) False
 
 --
 --
@@ -98,9 +158,63 @@ toImageRGB8 dimg = case dimg of
 
 doubleImageNN :: (Source s a) => Array s DIM3 a -> Array D DIM3 a
 doubleImageNN src = R.fromFunction sh' f where
-  sh@(Z :. h :. w :. k) = R.extent src
+  Z :. h :. w :. k = R.extent src
   sh' = Z :. h*2 :. w*2 :. k
   f (Z :. y :. x :. c) = src R.! (Z :. (y `div` 2) :. (x `div` 2) :. c)
+
+padEdge3 :: (Source s a) => Int -> Array s DIM3 a -> Array D DIM3 a
+padEdge3 n src = R.fromFunction sh' f where
+  Z :. h :. w :. k = R.extent src
+  sh' = Z :. h+n*2 :. w+n*2 :. k
+  f (Z :. y :. x :. c) = src R.! (Z :. y' :. x' :. c) where
+    !x' = clamp n (n + w - 1) x - n
+    !y' = clamp n (n + h - 1) y - n
+
+padEdge :: (Source s a) => Int -> Array s DIM2 a -> Array D DIM2 a
+padEdge n src = R.fromFunction sh' f where
+  Z :. h :. w = R.extent src
+  sh' = Z :. h+n*2 :. w+n*2
+  f (Z :. y :. x) = src R.! (Z :. y' :. x') where
+    !x' = clamp n (n + w - 1) x - n
+    !y' = clamp n (n + h - 1) y - n
+
+convolve :: (Source s Float) => Kernel -> Array s DIM2 Float -> Array R.PC5 DIM2 Float
+convolve k = R.mapStencil2 R.BoundClamp st where
+  !st = makeStencil2FromKernel 3 3 k -- TBD: take kW, kH
+
+makeStencil2FromKernel :: Int -> Int -> Kernel -> R.Stencil DIM2 Float
+makeStencil2FromKernel w h mat = R.makeStencil2 w h f where
+  !sh = Z :. h :. w
+  !ary = R.fromListUnboxed sh (concat mat)
+  f (Z :. y :. x) = if R.isInside2 sh i then Just (ary R.! i) else Nothing where
+    i = Z :. y + (h `div` 2) :. x + (w `div` 2)
+
+makeStencil2FromList' :: Int -> Int -> Kernel -> Array U DIM2 Float
+makeStencil2FromList' w h mat = ary where
+  !ary = R.fromListUnboxed (Z :. h :. w) (concat mat)
+
+a1 :: Array U DIM2 Float
+a1 = R.fromListUnboxed (Z:.8:.8) [1..64]
+
+s1 :: R.Stencil DIM2 Float
+s1 = makeStencil2FromKernel 3 3 [[0,0,0],[0,1,0],[0,0,0]]
+s2 :: R.Stencil DIM2 Float
+s2 = makeStencil2FromKernel 3 3 [[0.125,0.125,0.125],[0.125,0,0.125],[0.125,0.125,0.125]]
+
+addBias :: (Source s Float) => Float -> Array s DIM2 Float -> Array D DIM2 Float
+addBias b = R.map (+ b)
+
+cutNeg :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Float
+cutNeg = R.map $ \y -> max y 0 + 0.1 * min y 0
+
+sumP :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
+sumP = runIdentity . R.sumP . mergeChs . map f where
+  f :: (Source s Float) => Array s DIM2 Float -> Array D DIM3 Float
+  f ch = R.reshape (R.extent ch :. (1::Int)) ch
+  mergeChs :: [Array D DIM3 a] -> Array D DIM3 a
+  mergeChs [] = error "waifu2xMain.sumP.mergeChs: ERROR: empty list"
+  mergeChs [ch] = ch
+  mergeChs (ch:chs) = ch R.++ mergeChs chs
 
 --
 -- Frontend
