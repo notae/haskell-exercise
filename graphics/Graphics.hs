@@ -93,8 +93,8 @@ convBilinearNx n src = dst where
     p12 = pixelAtM (sx11 + 1) sy11
     p21 = pixelAtM sx11       (sy11 + 1)
     p22 = pixelAtM (sx11 + 1) (sy11 + 1)
-    valid x y = 0 <= x && x < w && 0 <= y && y < h
-    pixelAtM x y = if valid x y then Just $ pixelAt src x y else Nothing
+    valid px py = 0 <= px && px < w && 0 <= py && py < h
+    pixelAtM px py = if valid px py then Just $ pixelAt src px py else Nothing
     p = bilinear2 <$> pure rx <*> pure ry <*> p11 <*> p12 <*> p21 <*> p22 <|>
         bilinear <$> pure rx <*> p11 <*> p12 <|>
         bilinear <$> pure rx <*> p21 <*> p22 <|>
