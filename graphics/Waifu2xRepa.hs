@@ -85,10 +85,10 @@ waifu2xMain model src = dest where
   planesN = foldl' procStep planes0 (zip model [0..]) where
     procStep :: (Source s Float) => [Array s DIM2 Float] -> (Step, Int) -> [Array U DIM2 Float]
     procStep inPlanes (step, i) | traceStep inPlanes (step, i) = undefined
-    procStep inPlanes (step, _) =
+    procStep inPlanes (step, _) = inPlanes `seqList`
       zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
         procOutPlane :: [Kernel] -> Float -> Int -> Array U DIM2 Float
-        procOutPlane _ _ j | traceOutPlane step j = undefined
+        -- procOutPlane _ _ j | traceOutPlane step j = undefined
         procOutPlane ws b _ = runIdentity $ R.computeP $
                               cutNeg . addBias b . sumP $
                               zipWith convolve ws inPlanes
@@ -114,6 +114,10 @@ waifu2xMain model src = dest where
           False
   traceOutPlane step j =
     trace ("procOutPlane: " ++ show j ++ "/" ++ show (step ^. nOutputPlane)) False
+
+seqList :: [a] -> b -> b
+seqList []     b = b
+seqList (a:as) b = a `seq` seqList as b
 
 --
 --
@@ -147,13 +151,13 @@ doubleImageNN src = R.fromFunction sh' f where
   sh' = Z :. h*2 :. w*2 :. k
   f (Z :. y :. x :. c) = src R.! (Z :. (y `div` 2) :. (x `div` 2) :. c)
 
-padEdge3 :: (Source s a) => Int -> Array s DIM3 a -> Array D DIM3 a
-padEdge3 n src = R.fromFunction sh' f where
-  Z :. h :. w :. k = R.extent src
-  sh' = Z :. h+n*2 :. w+n*2 :. k
-  f (Z :. y :. x :. c) = src R.! (Z :. y' :. x' :. c) where
-    !x' = clamp n (n + w - 1) x - n
-    !y' = clamp n (n + h - 1) y - n
+-- padEdge3 :: (Source s a) => Int -> Array s DIM3 a -> Array D DIM3 a
+-- padEdge3 n src = R.fromFunction sh' f where
+--   Z :. h :. w :. k = R.extent src
+--   sh' = Z :. h+n*2 :. w+n*2 :. k
+--   f (Z :. y :. x :. c) = src R.! (Z :. y' :. x' :. c) where
+--     !x' = clamp n (n + w - 1) x - n
+--     !y' = clamp n (n + h - 1) y - n
 
 padEdge :: (Source s a) => Int -> Array s DIM2 a -> Array D DIM2 a
 padEdge n src = R.fromFunction sh' f where
@@ -172,11 +176,7 @@ makeStencil2FromKernel w h mat = R.makeStencil2 w h f where
   !sh = Z :. h :. w
   !ary = R.fromListUnboxed sh (concat mat)
   f (Z :. y :. x) = if R.isInside2 sh i then Just (ary R.! i) else Nothing where
-    i = Z :. y + (h `div` 2) :. x + (w `div` 2)
-
-makeStencil2FromList' :: Int -> Int -> Kernel -> Array U DIM2 Float
-makeStencil2FromList' w h mat = ary where
-  !ary = R.fromListUnboxed (Z :. h :. w) (concat mat)
+    !i = Z :. y + (h `div` 2) :. x + (w `div` 2)
 
 a1 :: Array U DIM2 Float
 a1 = R.fromListUnboxed (Z:.8:.8) [1..64]
@@ -222,17 +222,3 @@ main = do
   case result of Left s -> putStrLn $ "ERROR: " ++ s
                  Right dimg' -> do savePngImage oPath dimg'
                                    dumpImageInfo "Output Image" dimg' md
-
-
---
--- for debug
---
-
-test :: IO ()
-test = do
-  Right img <- R.readImage "test.jpg"
-  let img' = R.onImg (runIdentity . R.computeP . invert) img :: R.Img R.RGB
-  savePngImage "test.png" (R.imgToImage img')
-
-invert :: (Source s a, Num a, Shape sh) => Array s sh a -> Array D sh a
-invert = R.map (`subtract` 256)

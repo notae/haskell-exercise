@@ -49,6 +49,8 @@ Executable waifu2xrepa
   Main-Is:              Waifu2xRepa.hs
   -- Other-Modules:
   GHC-Options:          -Wall -O2 -threaded
+  -- GHC-Options:          -Wall -O2 -threaded -rtsopts -fprof-auto
+  -- GHC-Options:          -Wall -O2 -threaded -fllvm
   build-depends:       base
                      , transformers
                      , mtl
