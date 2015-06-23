@@ -20,6 +20,7 @@ import System.Environment    (getArgs)
 import Control.Lens
 
 import qualified Data.Array.Repa                  as R
+import qualified Data.Array.Repa.Repr.Vector      as R
 import qualified Data.Array.Repa.Specialised.Dim2 as R
 import qualified Data.Array.Repa.Stencil          as R
 import qualified Data.Array.Repa.Stencil.Dim2     as R
@@ -192,15 +193,19 @@ addBias b = R.map (+ b)
 cutNeg :: (Source s Float) => Array s DIM2 Float -> Array D DIM2 Float
 cutNeg = R.map $ \y -> max y 0 + 0.1 * min y 0
 
-sumP :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
-sumP = runIdentity . R.sumP . mergeChs . map f where
+sumP' :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
+sumP' = runIdentity . R.sumP . mergeChs . map f where
   f :: (Source s Float) => Array s DIM2 Float -> Array D DIM3 Float
   f ch = R.reshape (R.extent ch :. (1::Int)) ch
   mergeChs :: [Array D DIM3 a] -> Array D DIM3 a
   mergeChs = foldl1' (R.++)
-  -- mergeChs [] = error "waifu2xMain.sumP.mergeChs: ERROR: empty list"
-  -- mergeChs [ch] = ch
-  -- mergeChs (ch:chs) = ch R.++ mergeChs chs
+
+sumP :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
+sumP ps = runIdentity $ R.sumP $ R.fromFunction (sh :. l) f where
+  l = length ps
+  sh = R.extent (head ps)
+  ary = R.fromListVector (Z :. l) ps
+  f (Z :. y :. x :. i) = (ary R.! (Z :. i)) R.! (Z :. y :. x)
 
 --
 -- Frontend
