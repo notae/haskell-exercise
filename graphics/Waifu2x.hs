@@ -48,8 +48,8 @@ padEdge n img = generateImage f (w + n * 2) (h + n * 2) where
 cutNeg :: Plane -> Plane
 cutNeg = pixelMap $ \y -> max y 0 + 0.1 * min y 0
 
-convolute :: Kernel -> Plane -> Plane
-convolute k p = generateImage f w' h' where
+convolve :: Kernel -> Plane -> Plane
+convolve k p = generateImage f w' h' where
   (w, h) = getImageSize p
   (w', h') = (w - 2, h - 2)
   (kw, kh) = (length (head k), length k)
@@ -112,7 +112,7 @@ waifu2xMain model img = img' where
         procOutPlane :: [Kernel] -> Float -> Int -> Plane
         procOutPlane _ _ j | traceOutPlane step j = undefined
         procOutPlane ws b _ = cutNeg . addBias b . sumP $
-                              zipWith convolute ws inPlanes
+                              zipWith convolve ws inPlanes
 
   -- post-process
   y8' = pixelMap (floor . (* 255) . clamp 0 1) (head yf')
