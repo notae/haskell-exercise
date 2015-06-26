@@ -85,7 +85,8 @@ waifu2xMain model src = dest where
   planesN :: [Array U DIM2 Float]
   planesN = foldl' procStep planes0 (zip model [0..]) where
     procStep :: (Source s Float) => [Array s DIM2 Float] -> (Step, Int) -> [Array U DIM2 Float]
-    procStep inPlanes (step, i) | traceStep inPlanes (step, i) = undefined
+    procStep inPlanes (step, i) |
+      inPlanes `seqList` traceStep inPlanes (step, i) = undefined
     procStep inPlanes (step, _) = inPlanes `seqList`
       zipWith3 procOutPlane (step ^. weight) (step ^. bias) [0..] where
         procOutPlane :: [Kernel] -> Float -> Int -> Array U DIM2 Float
@@ -170,14 +171,31 @@ padEdge n src = R.fromFunction sh' f where
 
 convolve :: (Source s Float) => Kernel -> Array s DIM2 Float -> Array R.PC5 DIM2 Float
 convolve k = R.mapStencil2 R.BoundClamp st where
-  !st = makeStencil2FromKernel 3 3 k -- TBD: take kW, kH
+  !st = makeStencil2FromKernel' 3 3 k -- TBD: take kW, kH
 
+{-# INLINE makeStencil2FromKernel #-}
 makeStencil2FromKernel :: Int -> Int -> Kernel -> R.Stencil DIM2 Float
-makeStencil2FromKernel w h mat = R.makeStencil2 w h f where
+makeStencil2FromKernel w h mat = R.makeStencil2 h w f where
   !sh = Z :. h :. w
   !ary = R.fromListUnboxed sh (concat mat)
-  f (Z :. y :. x) = if R.isInside2 sh i then Just (ary R.! i) else Nothing where
-    !i = Z :. y + (h `div` 2) :. x + (w `div` 2)
+  !f = stfunc sh ary (h `div` 2) (w `div` 2)
+
+{-# INLINE makeStencil2FromKernel' #-}
+makeStencil2FromKernel' :: Int -> Int -> Kernel -> R.Stencil DIM2 Float
+makeStencil2FromKernel' !w !h !mat = R.makeStencil2' h w f where
+  !sh = Z :. h :. w
+  !ary = R.fromListUnboxed sh (concat mat)
+  !f = stfunc' sh ary (h `div` 2) (w `div` 2)
+
+{-# INLINE stfunc #-}
+stfunc :: Source r a => DIM2 -> Array r DIM2 a -> Int -> Int -> DIM2 -> Maybe a
+stfunc sh ary cy cx (_ :. y :. x) =
+  if R.isInside2 sh i then Just (ary R.! i) else Nothing where
+    !i = Z :. y + cy :. x + cx
+
+{-# INLINE stfunc' #-}
+stfunc' :: Source r a => DIM2 -> Array r DIM2 a -> Int -> Int -> DIM2 -> a
+stfunc' !sh !ary !cy !cx (_ :. y :. x) = ary R.! (Z :. y + cy :. x + cx)
 
 a1 :: Array U DIM2 Float
 a1 = R.fromListUnboxed (Z:.8:.8) [1..64]
@@ -195,10 +213,10 @@ cutNeg = R.map $ \y -> max y 0 + 0.1 * min y 0
 
 sumP :: (Source s Float) => [Array s DIM2 Float] -> Array U DIM2 Float
 sumP ps = runIdentity $ R.sumP $ R.fromFunction (sh :. l) f where
-  l = length ps
-  sh = R.extent (head ps)
-  ary = R.fromListVector (Z :. l) ps
-  f (Z :. y :. x :. i) = (ary R.! (Z :. i)) R.! (Z :. y :. x)
+  !l = length ps
+  !sh = R.extent (head ps)
+  !ary = R.fromListVector (Z :. l) ps
+  f (_ :. y :. x :. i) = (ary R.! (Z :. i)) R.! (Z :. y :. x)
 
 --
 -- Frontend

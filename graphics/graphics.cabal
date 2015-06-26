@@ -48,9 +48,12 @@ Executable waifu2xrepa
   Default-Language:     Haskell2010
   Main-Is:              Waifu2xRepa.hs
   -- Other-Modules:
-  GHC-Options:          -Wall -O2 -threaded
+  -- GHC-Options:          -Wall -O2 -threaded -v5
+  -- GHC-Options:          -Wall -O2 -threaded -rtsopts -ddump-prep
+  GHC-Options:          -Wall -O2 -threaded -rtsopts -fllvm
   -- GHC-Options:          -Wall -O2 -threaded -rtsopts -fprof-auto
-  -- GHC-Options:          -Wall -O2 -threaded -fllvm
+  -- GHC-Options:          -Wall -O2 -threaded -rtsopts -eventlog
+
   build-depends:       base
                      , transformers
                      , mtl
