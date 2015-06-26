@@ -180,22 +180,47 @@ makeStencil2FromKernel w h mat = R.makeStencil2 h w f where
   !ary = R.fromListUnboxed sh (concat mat)
   !f = stfunc sh ary (h `div` 2) (w `div` 2)
 
-{-# INLINE makeStencil2FromKernel' #-}
-makeStencil2FromKernel' :: Int -> Int -> Kernel -> R.Stencil DIM2 Float
-makeStencil2FromKernel' !w !h !mat = R.makeStencil2' h w f where
-  !sh = Z :. h :. w
-  !ary = R.fromListUnboxed sh (concat mat)
-  !f = stfunc' sh ary (h `div` 2) (w `div` 2)
-
 {-# INLINE stfunc #-}
 stfunc :: Source r a => DIM2 -> Array r DIM2 a -> Int -> Int -> DIM2 -> Maybe a
 stfunc sh ary cy cx (_ :. y :. x) =
   if R.isInside2 sh i then Just (ary R.! i) else Nothing where
     !i = Z :. y + cy :. x + cx
 
+convolve' :: (Source s Float) => Kernel -> Array s DIM2 Float -> Array R.PC1 DIM2 Float
+convolve' k = R.mapStencil2' R.BoundClamp st where
+  !st = makeStencil2FromKernel' 3 3 k -- TBD: take kW, kH
+
+{-# INLINE makeStencil2FromKernel' #-}
+makeStencil2FromKernel' :: Int -> Int -> Kernel -> R.Stencil DIM2 Float
+makeStencil2FromKernel' !w !h !mat = makeStencil2' h w f where
+  !sh = Z :. h :. w
+  !ary = R.fromListUnboxed sh (concat mat)
+  !f = stfunc' sh ary (h `div` 2) (w `div` 2)
+
 {-# INLINE stfunc' #-}
 stfunc' :: Source r a => DIM2 -> Array r DIM2 a -> Int -> Int -> DIM2 -> a
 stfunc' !sh !ary !cy !cx (_ :. y :. x) = ary R.! (Z :. y + cy :. x + cx)
+
+makeStencil'
+	:: Num a
+	=> sh
+	-> (sh -> a)
+	-> R.Stencil sh a
+
+{-# INLINE makeStencil' #-}
+makeStencil' ex getCoeff
+ = R.StencilStatic ex 0
+ $ \i val acc -> acc + val * (getCoeff i)
+
+makeStencil2'
+	:: Num a
+	=> Int -> Int
+	-> (DIM2 -> a)
+	-> R.Stencil DIM2 a
+
+{-# INLINE makeStencil2' #-}
+makeStencil2' height width getCoeff
+	= makeStencil' (Z :. height :. width) getCoeff
 
 a1 :: Array U DIM2 Float
 a1 = R.fromListUnboxed (Z:.8:.8) [1..64]
