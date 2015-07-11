@@ -13,17 +13,28 @@ import Data.Maybe
 import Data.STRef.Lazy
 
 -- Interface
+{-
+forall a.
+  a    a
+  f    g
+  s -> t -> b
+       m
+-}
 
-type GNT s t f g = Applicative m => (forall a. f a -> m (g a)) -> s -> m t
+type GNT s t f g =
+  forall m. Applicative m => (forall a. f a -> m (g a)) -> s -> m t
 type GUnlift t b g = Applicative g => t -> g b
--- type GUnlift s t f g =
---   Applicative m => (forall a. f a -> m (g a)) -> s -> m (g t)
+type GUnlift' s b f g =
+  (Applicative m, Applicative g) => (forall a. f a -> m (g a)) -> s -> m (g b)
 
 class HasGNT s t f g where
   gnt :: GNT s t f g
 
 class HasUnlift t b g where
   gunlift :: GUnlift t b g
+
+class HasUnlift' s b f g where
+  gunlift' :: GUnlift' s b f g
 
 -- Instances
 ntTuple :: GNT (f a, f b) (g a, g b) f g
@@ -32,11 +43,20 @@ ntTuple f (a, b) = (,) <$> f a <*> f b
 instance HasGNT (f a, f b) (g a, g b) f g where
   gnt = ntTuple
 
-unliftTuple :: GUnlift (f a, f b) (a, b) f
+unliftTuple :: GUnlift (g a, g b) (a, b) g
 unliftTuple (a, b) = (,) <$> a <*> b
 
-instance HasUnlift (f a, f b) (a, b) f where
+instance HasUnlift (g a, g b) (a, b) g where
   gunlift = unliftTuple
+
+unliftTuple' :: GUnlift' (f a, f b) (a, b) f g
+unliftTuple' f = liftA unliftTuple . ntTuple f
+
+instance HasUnlift' (f a, f b) (a, b) f g where
+  gunlift' = unliftTuple'
+
+testUnliftTuple' :: Maybe [(Int, Bool)]
+testUnliftTuple' = gunlift' (Just . maybeToList) (Just (1::Int), Just True)
 
 -- Usecase
 
@@ -65,9 +85,8 @@ newV' vs = gnt (fmap Var . newSTRef) vs
 getV' :: HasGNT t' t (Var s) [] => t' -> ST s t
 getV' vs = gnt (readSTRef . getVar) vs
 
--- The type variable ‘t’ is ambiguous
--- getVM' :: (HasGNT t' t (Var s) [], HasUnlift t b []) => t' -> ST s [b]
--- getVM' = gunlift . gnt (readSTRef . getVar)
+getV'' :: HasUnlift' t' b (Var s) [] => t' -> ST s [b]
+getV'' = gunlift' (readSTRef . getVar)
 
 testST' :: ST s [(Int, Bool)]
 testST' = do
@@ -75,8 +94,9 @@ testST' = do
   modifySTRef (v^._1 & getVar) (fmap (+1))
   -- modifySTRef (getVar $ fst v) (fmap (+(1::Int)))
   -- modifySTRef (getVar $ snd v) (fmap not)
-  vs <- getV' v -- :: ST s ([Int], [Bool])
-  return $ gunlift (vs :: ([Int], [Bool]))
+  -- vs <- getV' v -- :: ST s ([Int], [Bool])
+  -- return $ gunlift (vs :: ([Int], [Bool]))
+  getV'' v
 
 testState :: MonadState Int m => m Int
 testState = do
