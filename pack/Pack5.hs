@@ -8,7 +8,6 @@ module Pack5 where
 import Control.Applicative
 import Control.Lens
 import Control.Monad.ST.Lazy
-import Control.Monad.State
 import Data.Maybe
 import Data.STRef.Lazy
 
@@ -23,7 +22,9 @@ forall a.
 
 type GNT s t f g =
   forall m. Applicative m => (forall a. f a -> m (g a)) -> s -> m t
+
 type GUnlift t b g = Applicative g => t -> g b
+
 type GUnlift' s b f g =
   (Applicative m, Applicative g) => (forall a. f a -> m (g a)) -> s -> m (g b)
 
@@ -65,10 +66,10 @@ data Var s a = Var { getVar :: STRef s [a] }
 --   using type synonyms
 
 newV :: GNT t' t [] (Var s) -> t' -> ST s t
-newV nt vs = nt (fmap Var . newSTRef) vs
+newV nt = nt (fmap Var . newSTRef)
 
 getV :: GNT t' t (Var s) [] -> t' -> ST s t
-getV nt vs = nt (readSTRef . getVar) vs
+getV nt = nt (readSTRef . getVar)
 
 testST :: ST s [(Int, Bool)]
 testST = do
@@ -80,24 +81,19 @@ testST = do
 --   using type classes
 
 newV' :: HasGNT t' t [] (Var s) => t' -> ST s t
-newV' vs = gnt (fmap Var . newSTRef) vs
+newV' = gnt (fmap Var . newSTRef)
 
 getV' :: HasGNT t' t (Var s) [] => t' -> ST s t
-getV' vs = gnt (readSTRef . getVar) vs
+getV' = gnt (readSTRef . getVar)
 
 getV'' :: HasUnlift' t' b (Var s) [] => t' -> ST s [b]
 getV'' = gunlift' (readSTRef . getVar)
 
+incV' :: Var s Int -> ST s ()
+incV' v = modifySTRef (getVar v) (fmap succ)
+
 testST' :: ST s [(Int, Bool)]
 testST' = do
   v <- newV' ([1::Int, 2], [True, False]) :: ST s (Var s Int, Var s Bool)
-  modifySTRef (v^._1 & getVar) (fmap (+1))
-  -- modifySTRef (getVar $ fst v) (fmap (+(1::Int)))
-  -- modifySTRef (getVar $ snd v) (fmap not)
-  -- vs <- getV' v -- :: ST s ([Int], [Bool])
-  -- return $ gunlift (vs :: ([Int], [Bool]))
+  incV' (v^._1)
   getV'' v
-
-testState :: MonadState Int m => m Int
-testState = do
-  return 1
