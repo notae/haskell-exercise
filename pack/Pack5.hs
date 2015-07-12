@@ -10,8 +10,12 @@ import Control.Applicative
 import Control.Lens
 import Control.Monad.ST.Lazy
 import Data.Dynamic
+import Data.Functor.Identity
 import Data.Maybe
 import Data.STRef.Lazy
+
+import qualified Data.Foldable    as F
+import qualified Data.Traversable as T
 
 -- Interface
 {-
@@ -49,6 +53,37 @@ class HasUnlift' s b f g where
 
 -- Instances
 
+--   Traversable
+
+instance (F.Foldable t, C a) => HasList (t a) where
+  toList f = fmap f . F.toList
+
+instance (T.Traversable t, C a) => HasGNT (t (f a)) (t (g a)) f g where
+  gnt f = traverse f
+
+instance (T.Traversable t, Applicative f) => HasUnlift (t (f a)) (t a) f where
+  gunlift = traverse id
+
+instance (T.Traversable t, Applicative f, C a) => HasUnlift' (t (f a)) (t a) f g where
+  -- gunlift' f = liftA gunlift . gnt f
+  gunlift' f = liftA gunlift . traverse f
+
+{-|
+>>> testNTTraversable
+[[1],[2]]
+-}
+testNTTraversable :: [[Int]]
+testNTTraversable = runIdentity $ gnt (Identity . maybeToList) [Just (1::Int), Just 2]
+
+{-|
+>>> testUnliftTraversable'
+Just [[1,2]]
+-}
+testUnliftTraversable' :: Maybe [[Int]]
+testUnliftTraversable' = gunlift' (Just . maybeToList) [Just (1::Int), Just 2]
+
+--   (,)
+
 instance (C a, C b) => HasList (a, b) where
   toList f (a, b) = [f a, f b]
 
@@ -70,6 +105,17 @@ unliftTuple' f = liftA unliftTuple . ntTuple f
 instance (C a, C b) => HasUnlift' (f a, f b) (a, b) f g where
   gunlift' = unliftTuple'
 
+{-|
+>>> testNTTuple
+([1],[True])
+-}
+testNTTuple :: ([Int], [Bool])
+testNTTuple = runIdentity $ gnt (Identity . maybeToList) (Just (1::Int), Just True)
+
+{-|
+>>> testUnliftTuple'
+Just [(1,True)]
+-}
 testUnliftTuple' :: Maybe [(Int, Bool)]
 testUnliftTuple' = gunlift' (Just . maybeToList) (Just (1::Int), Just True)
 
