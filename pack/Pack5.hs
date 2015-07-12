@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,6 +9,7 @@ module Pack5 where
 import Control.Applicative
 import Control.Lens
 import Control.Monad.ST.Lazy
+import Data.Dynamic
 import Data.Maybe
 import Data.STRef.Lazy
 
@@ -17,16 +19,24 @@ forall a.
   a    a
   f    g
   s -> t -> b
-       m
+       m    m
 -}
 
+-- type C a = (Show a, Ord a)
+type C a = Typeable a
+
+type ToList t = forall g. (forall a. C a => a -> g) -> t -> [g]
+
 type GNT s t f g =
-  forall m. Applicative m => (forall a. f a -> m (g a)) -> s -> m t
+  forall m. Applicative m => (forall a. C a => f a -> m (g a)) -> s -> m t
 
 type GUnlift t b g = Applicative g => t -> g b
 
 type GUnlift' s b f g =
-  (Applicative m, Applicative g) => (forall a. f a -> m (g a)) -> s -> m (g b)
+  (Applicative m, Applicative g) => (forall a. C a => f a -> m (g a)) -> s -> m (g b)
+
+class HasList t where
+  toList :: ToList t
 
 class HasGNT s t f g where
   gnt :: GNT s t f g
@@ -38,10 +48,14 @@ class HasUnlift' s b f g where
   gunlift' :: GUnlift' s b f g
 
 -- Instances
-ntTuple :: GNT (f a, f b) (g a, g b) f g
+
+instance (C a, C b) => HasList (a, b) where
+  toList f (a, b) = [f a, f b]
+
+ntTuple :: (C a, C b) => GNT (f a, f b) (g a, g b) f g
 ntTuple f (a, b) = (,) <$> f a <*> f b
 
-instance HasGNT (f a, f b) (g a, g b) f g where
+instance (C a, C b) => HasGNT (f a, f b) (g a, g b) f g where
   gnt = ntTuple
 
 unliftTuple :: GUnlift (g a, g b) (a, b) g
@@ -50,10 +64,10 @@ unliftTuple (a, b) = (,) <$> a <*> b
 instance HasUnlift (g a, g b) (a, b) g where
   gunlift = unliftTuple
 
-unliftTuple' :: GUnlift' (f a, f b) (a, b) f g
+unliftTuple' :: (C a, C b) => GUnlift' (f a, f b) (a, b) f g
 unliftTuple' f = liftA unliftTuple . ntTuple f
 
-instance HasUnlift' (f a, f b) (a, b) f g where
+instance (C a, C b) => HasUnlift' (f a, f b) (a, b) f g where
   gunlift' = unliftTuple'
 
 testUnliftTuple' :: Maybe [(Int, Bool)]
@@ -95,5 +109,6 @@ incV' v = modifySTRef (getVar v) (fmap succ)
 testST' :: ST s [(Int, Bool)]
 testST' = do
   v <- newV' ([1::Int, 2], [True, False]) :: ST s (Var s Int, Var s Bool)
+  -- v <- newV' ([1::Int, 2], [True, False])
   incV' (v^._1)
   getV'' v
