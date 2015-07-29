@@ -20,6 +20,7 @@ import Data.Map (Map)
 import Data.Set (Set)
 import Data.List (sort)
 
+import qualified GHC.Exts as GHCExts
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -239,10 +240,14 @@ cnt4 = CNT (Identity . Set.fromList)
 pcntTest2 :: Pair_ Int Bool Set
 pcntTest2 = runIdentity $ pcnt cnt4 p2
 
+class IsCNT f g where
+  type NTTyCxt (f :: * -> *) (g :: * -> *) a :: GHCExts.Constraint
+  type NTCxt (f :: * -> *) (g :: * -> *) :: * -> *
+
+
 -- NT-like transformation over structure
 
-class Applicative m =>
-      GCNT s t f g c m | s -> f, t -> g where
+class Applicative m => GCNT s t f g c m | s -> f, t -> g where
   gcntA :: (f :~-> g) c m -> s -> m t
 
 instance (c a, c b, Applicative m) =>
@@ -261,13 +266,13 @@ testGNT2 = runIdentity $ gcntA (CNT (Identity . Set.fromList) :: ([] :~-> Set) O
 
 -- NT-like transformation over parameterized structure
 
-class Applicative m =>
-      PGCNT t f g c m where
+class Applicative m => PGCNT t f g c m where
   pgcntA :: (f :~-> g) c m -> t f -> m (t g)
 
 instance (c a, c b, Applicative m) =>
          PGCNT (PairV a b) f g c m where
-  pgcntA cntA (PairV (Pair a b)) = PairV <$> (Pair <$> (cntA $- a) <*> (cntA $- b))
+  pgcntA cntA (PairV (Pair a b)) =
+    PairV <$> (Pair <$> (cntA $- a) <*> (cntA $- b))
 
 {-|
 >>> testPGNT1
@@ -289,3 +294,10 @@ testPGNT3 = under (_Wrapping PairV) (runIdentity . pgcntA cnt4) p2
 -- NG: The type variable ‘t0’ is ambiguous
 -- testPGNT4 :: Pair_ Int Bool Set
 -- testPGNT4 = under _Wrapped (runIdentity . pgcntA cnt4) p2
+
+{-|
+>>> under (_Wrapping PairV) testPGNT5 p2
+Pair {_px = fromList [1,2,3], _py = fromList [False,True]}
+-}
+testPGNT5 :: PGCNT t [] Set Ord Identity => t [] -> t Set
+testPGNT5 = runIdentity . pgcntA cnt4
