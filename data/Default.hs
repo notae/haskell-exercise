@@ -87,14 +87,17 @@ resolve' (Value a) = a
 
 -- with default value in short symbol
 
-_' :: HasDefault a => a
-_' = defaultValue
+__ :: HasDefault a => a
+__ = defaultValue
 cs3 :: [Color]
-cs3 = [Red, Green, Blue, _']
+cs3 = [Red, Green, Blue, __]
 
 -- for list type
 
 instance HasDefault [Color] where
   defaultValue = [Red, Blue]
 cs4 :: [[Color]]
-cs4 = [[Red], [Blue, Green], [], _']
+cs4 = [[Red], [Blue, Green], [], __]
+
+test :: Int -> Int
+test v = 1
