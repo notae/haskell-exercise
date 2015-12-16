@@ -48,8 +48,27 @@ d3 = 3
 d8 :: Deg
 d8 = 8
 
---
--- Domain
---
-data Domain (l :: Nat) (u :: Nat) = Domain deriving (Show)
--- type family `:*:` x y
+-- Interval
+type family IAdd (m :: (Nat, Nat)) (n :: (Nat, Nat)) :: (Nat, Nat)
+type instance IAdd '(l, u) '(l', u') = '(l+l', u+u')
+
+type family IAdd' (l :: Nat) (u :: Nat) (l' :: Nat) (u' :: Nat) :: (Nat, Nat)
+type instance IAdd' l u l' u' = '(l+l', u+u')
+
+data I (r :: (Nat, Nat)) = I deriving (Show)
+
+{-|
+>>> :t i
+i :: I '(3, 8)
+-}
+i :: I ('(1, 3) `IAdd` '(2, 5))
+i = I
+
+{-
+Domain:
+  example in MiniZinc
+    var 1..3: a;
+    var 2..5: b;
+    constraint a = b   % domains of a and b is reduced to 2..3
+-}
+
