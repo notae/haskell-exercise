@@ -26,6 +26,10 @@ newtype FDValue a =
   V Int
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
+--
+-- Validate values in constructor at runtime
+--
+
 newtype RangedInt (l :: Nat) (u :: Nat) =
   RInt Int
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
@@ -48,14 +52,15 @@ d3 = 3
 d8 :: Deg
 d8 = 8
 
--- Interval
+--
+-- Validate at compile time
+--
+
 type family IAdd (m :: (Nat, Nat)) (n :: (Nat, Nat)) :: (Nat, Nat)
 type instance IAdd '(l, u) '(l', u') = '(l+l', u+u')
 
 type family IAdd' (l :: Nat) (u :: Nat) (l' :: Nat) (u' :: Nat) :: (Nat, Nat)
 type instance IAdd' l u l' u' = '(l+l', u+u')
-
-data I (r :: (Nat, Nat)) = I deriving (Show)
 
 {-|
 >>> :t i
@@ -63,6 +68,33 @@ i :: I '(3, 8)
 -}
 i :: I ('(1, 3) `IAdd` '(2, 5))
 i = I
+
+data I (r :: (Nat, Nat)) = I deriving (Show)
+
+iadd :: I x -> I y -> I (x `IAdd` y)
+x `iadd` y = I
+
+ix :: I '(1, 3)
+ix = I
+iy :: I '(2, 5)
+iy = I
+iz :: I '(3, 8)
+iz = ix `iadd` iy
+
+data P (p :: Nat) = P deriving (Show)
+type P' (p :: Nat) = Proxy p
+
+iread :: (l <= p, p <= u, KnownNat p) => P p -> I '(l, u) -> Int
+iread p i = fromInteger $ natVal p
+
+p2 :: P 2
+p2 = P
+p4 :: P 4
+p4 = P
+
+-- Check given point in the interval at compile time
+r2 = iread p2 ix  -- valid
+-- r4 = iread p4 ix  -- type error
 
 {-
 Domain:
