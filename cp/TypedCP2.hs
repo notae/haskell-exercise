@@ -15,16 +15,39 @@ import Data.Coerce
 import Data.Proxy
 import GHC.TypeLits
 
+--
+-- Coerce into Int using Enum class
+--
+
 type IsFDValue a = (Ord a, Enum a)
 
--- An example type of FDValue
 data Color =
   Red | Green | Blue
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 newtype FDValue a =
   V Int
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+  deriving (Eq, Ord, Enum, Bounded)
+
+mkV :: Enum a => a -> FDValue a
+mkV a = V (fromEnum a)
+
+unV :: Enum a => FDValue a -> a
+unV (V i) = toEnum i
+
+instance (Show a, Enum a) => Show (FDValue a) where
+  show (V i) = show (toEnum i :: a)
+
+pred1 :: Color -> Color -> Bool
+pred1 x     y     | x == y = True
+pred1 Red   Blue  = True
+pred1 Blue  Red   = True
+pred1 Green Blue  = True
+pred1 Blue  Green = True
+pred1 _     _     = False
+
+evalPred :: Enum a => (a -> a -> Bool) -> FDValue a -> FDValue a -> Bool
+evalPred p x y = p (unV x) (unV y)
 
 --
 -- Validate values in constructor at runtime
