@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
@@ -14,6 +15,39 @@ import Control.Monad.Operational
 import Data.Coerce
 import Data.Proxy
 import GHC.TypeLits
+
+import RangedInt
+
+--
+-- RangedInt examples
+--
+
+-- ric1 :: RangedInt 1 1
+ric1 = $(ric 1)
+
+ri1 :: RangedInt 1 1
+ri1 = 2
+
+f1 :: RangedInt 3 5 -> RangedInt 5 7
+f1 x = x @+ $(ric 2)
+
+f2 :: RangedInt l u -> RangedInt (l + 2) (u + 2)
+f2 x = x @+ $(ric 2)
+
+f3 :: RangedInt 0 31 -> RangedInt 0 15 -> RangedInt 0 (31+15)
+f3 x y = x @+ y
+
+-- ex. ranged to [1, 7]
+type Deg = RangedInt 1 7
+
+-- OK
+d3 :: Deg
+d3 = 3
+
+-- Wish to detect the invalid value at compile time
+d8 :: Deg
+d8 = 8
+
 
 --
 -- Coerce into Int using Enum class
@@ -48,32 +82,6 @@ pred1 _     _     = False
 
 evalPred :: Enum a => (a -> a -> Bool) -> FDValue a -> FDValue a -> Bool
 evalPred p x y = p (unV x) (unV y)
-
---
--- Validate values in constructor at runtime
---
-
-newtype RangedInt (l :: Nat) (u :: Nat) =
-  RInt Int
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
-
-instance (KnownNat l, KnownNat u) => Num (RangedInt l u) where
-  fromInteger i = if (natVal (Proxy :: Proxy l)) <= i &&
-                     i <= (natVal (Proxy :: Proxy u))
-                  then RInt (fromInteger i)
-                  else error $ "fromInteger: invalid value: " ++ show i
-
---  (RInt x) + (RInt y) = maximum []
-
-type Deg = RangedInt 1 7
-
--- OK
-d3 :: Deg
-d3 = 3
-
--- Wish to detect the invalid value at compile time
-d8 :: Deg
-d8 = 8
 
 --
 -- Validate at compile time
