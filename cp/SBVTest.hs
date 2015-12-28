@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module SBVTest where
 
 import Data.SBV
@@ -32,3 +34,22 @@ Solution #4:
 Found 4 different solutions.
 -}
 allSatPyt = allSat . pyt
+
+{-|
+Monadic style:
+>>> allSat monadic
+Solution #1:
+  x = 2 :: Integer
+  y = 1 :: Integer
+Solution #2:
+  x = 1 :: Integer
+  y = 2 :: Integer
+Found 2 different solutions.
+-}
+monadic :: Symbolic SBool
+monadic = do x <- exists "x"
+             y <- exists "y"
+             constrain $ x .> 0
+             constrain $ y .> 0
+             constrain $ x + y .== (3 :: SInteger)
+             return (true :: SBool)
