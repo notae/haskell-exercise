@@ -78,7 +78,7 @@ monadic = do x <- exists "x"
 
 {-|
 Enumeration
->>> allSat enum
+>>> allSat enums
 Solution #1:
   s0 = Red :: Color
 Solution #2:
@@ -91,19 +91,28 @@ Found 4 different solutions.
 -}
 
 data Color = Red | Green | Blue | Yellow
-           deriving (Show, Read, Eq, Ord, Data, SymWord, HasKind)
+           deriving (Show, Read, Eq, Ord, Data, SymWord, HasKind, SatModel)
 type SColor = SBV Color
 
-enum :: SColor -> Symbolic SBool
-enum c = return $ c .== c
+enums :: SColor -> SBool
+enums c = c .== c
 
 {-|
-Extract enumeration values. This is *not* type-checked at compile time.
->>> extractEnum
+Extract enumeration values. These are *not* type-checked at compile time.
+>>> extractEnums
 [Red,Green,Blue,Yellow]
 -}
-extractEnum :: IO [Color]
-extractEnum = do
-  r <- allSat $ do (x :: SColor) <- exists "c"
-                   return $ x .== x
-  return $ catMaybes $ getModelValues "c" r
+extractEnums :: IO [Color]
+extractEnums = do
+  r <- allSat enums
+  return $ extractModels r
+
+{-|
+Extract tuple values. These are *not* type-checked at compile time.
+>>> extractTuples
+[(-1,Red),(0,Green),(1,Blue),(-1,Yellow),(1,Red),(-1,Green),(0,Red),(1,Yellow),(1,Green),(0,Yellow),(0,Blue),(-1,Blue)]
+-}
+extractTuples :: IO [(Integer, Color)]
+extractTuples = do
+  r <- allSat $ \(x::SInteger, c::SColor) -> abs x .<= 1
+  return $ extractModels r
