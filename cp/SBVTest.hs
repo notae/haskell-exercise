@@ -1,12 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module SBVTest where
 
-import Data.SBV
 import Data.Generics
-import Data.Maybe (catMaybes)
+import Data.SBV
 
 -- | Pythagorean triple
 pyt :: SInteger -> (SInteger, SInteger, SInteger) -> SBool
