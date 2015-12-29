@@ -1,11 +1,7 @@
-{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 module SBVTest2 where
 
@@ -23,20 +19,15 @@ class SatVar a where
 allSat' :: SatSpace a => (Var a -> Predicate) -> IO [a]
 allSat' p = (allSat $ varExists >>= p) >>= return . extractModels
 
-instance (SymWord a, SymWord b) => SatVar (SBV a, SBV b) where
-  varExists = do
-    (a :: SBV a) <- exists_
-    (b :: SBV b) <- exists_
-    return (a, b)
-
-instance (SymWord a, SymWord b, SatModel (a, b)) => SatSpace (a, b) where
-  type Var (a, b) = (SBV a, SBV b)
+spc :: SatSpace a =>
+       (Predicate -> IO AllSatResult) -> (Var a -> Predicate) -> IO [a]
+spc op p = (op $ varExists >>= p) >>= return . extractModels
 
 data V_ i c = V { vi :: i, vc :: c }
-            deriving (Show)
+            deriving (Show, Eq)
 type V = V_ Integer Color
 
-instance SatModel (V_ Integer Color) where
+instance SatModel V where
   parseCWs is = do (i, cs) <- parseCWs is
                    (c, xs) <- parseCWs cs
                    return (V i c, xs)
@@ -50,8 +41,16 @@ instance SatVar (V_ SInteger SColor) where
 instance SatSpace (V_ Integer Color) where
   type Var (V_ Integer Color) = V_ SInteger SColor
 
-test1 :: IO [(Color, Color)]
-test1 = allSat' $ \(x, y) -> return $ x .== y
+{-|
+>>> test1
+[V {vi = -1, vc = Red},V {vi = 0, vc = Green},V {vi = 1, vc = Blue},V {vi = -1, vc = Yellow},V {vi = 1, vc = Red},V {vi = -1, vc = Green},V {vi = 0, vc = Red},V {vi = 1, vc = Yellow},V {vi = 1, vc = Green},V {vi = 0, vc = Yellow},V {vi = 0, vc = Blue},V {vi = -1, vc = Blue}]
+-}
+test1 :: IO [V]
+test1 = allSat' $ \(V i c) -> return $ abs i .<= 1
 
+{-|
+>>> (==) <$> test1 <*> test2
+True
+-}
 test2 :: IO [V]
-test2 = allSat' $ \(V i c) -> return $ abs i .<= 1
+test2 = spc allSat $ \(V i c) -> return $ abs i .<= 1
