@@ -115,3 +115,15 @@ extractTuples :: IO [(Integer, Color)]
 extractTuples = do
   r <- allSat $ \(x::SInteger, c::SColor) -> abs x .<= 1
   return $ extractModels r
+
+{-|
+Solve and extract lists.
+-}
+extractLists :: IO [[Integer]]
+extractLists = do
+  r <- allSat $ do
+       vs <- mkExistVars 3
+       flip mapM_ vs $ \v -> constrain $ v .>= 1 &&& v .<= 3
+       constrain $ allDifferent (vs :: [SInteger])
+       return $ (true :: SBool)
+  return $ extractModels r
