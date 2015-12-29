@@ -20,6 +20,7 @@ library
                      , TypedCP2
                      , RangedInt
                      , SBVTest
+                     , SBVTest2
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base
