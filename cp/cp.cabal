@@ -19,6 +19,7 @@ library
   exposed-modules:     TypedCP
                      , TypedCP2
                      , RangedInt
+                     , SBVExts
                      , SBVTest
                      , SBVTest2
   -- other-modules:       
