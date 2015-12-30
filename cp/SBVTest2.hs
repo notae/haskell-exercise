@@ -14,6 +14,9 @@ import Data.SBV
 import SBVExts
 import SBVTest (Color (..), SColor)
 
+{-
+an example of user-defined data type
+-}
 data V_ i c = V { vi :: i, vc :: c } deriving (Show, Eq)
 type V = V_ Integer Color
 type SV = V_ SInteger SColor
@@ -50,7 +53,9 @@ test2 = spc allSat $ \((V i c) :: SV) -> return $ abs i .<= 1
 test3 :: IO [Integer]
 test3 = spc allSat $ \(i :: SInteger) -> return $ abs i .<= 1
 
-
+{-
+another example of user-defined data type
+-}
 data SizedList (l :: Nat) a = SizedList [a] deriving (Show)
 
 mkSList :: forall l a. KnownNat l => [a] -> SizedList l a
@@ -73,7 +78,7 @@ instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
                   Just (a, ys) -> case parseCWs ys of
                                     Just (as, zs) -> Just (mkSList (a:as), zs)
                                     Nothing       -> Just (mkSList [], ys)
-                  Nothing     -> Just (SizedList [], xs)
+                  Nothing     -> Just (mkSList [], xs)
 
 instance (SymWord a, KnownNat l) => SatVar (SizedList l (SBV a)) where
   varExists = do
