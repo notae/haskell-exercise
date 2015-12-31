@@ -3,10 +3,13 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module SBVTest2 where
 
+import Control.Monad
 import Data.Generics
+import Data.List
 import GHC.TypeLits
 
 import Data.SBV
@@ -17,7 +20,7 @@ import SBVTest (Color (..), SColor)
 {-
 an example of user-defined data type
 -}
-data V_ i c = V { vi :: i, vc :: c } deriving (Show, Eq)
+data V_ i c = V { vi :: i, vc :: c } deriving (Show, Eq, Ord)
 type V = V_ Integer Color
 type SV = V_ SInteger SColor
 
@@ -54,9 +57,9 @@ test3 :: IO [Integer]
 test3 = spc allSat $ \(i :: SInteger) -> return $ abs i .<= 1
 
 {-
-another example of user-defined data type
+an example of user-defined container type
 -}
-data SizedList (l :: Nat) a = SizedList [a] deriving (Show)
+data SizedList (l :: Nat) a = SizedList [a] deriving (Show, Eq, Ord)
 
 mkSList :: forall l a. KnownNat l => [a] -> SizedList l a
 mkSList xs =
@@ -68,9 +71,10 @@ mkSList xs =
 lengthSList :: forall l a. KnownNat l => SizedList l a -> Integer
 lengthSList _ = natVal (Proxy :: Proxy l)
 
-instance (SatModel a, SymWord a, KnownNat l) =>
-         SatSpace (SizedList l (SBV a)) where
-  type Val (SizedList l (SBV a)) = SizedList l a
+instance (SatModel (Val (SizedList l v)), SatVar (SizedList l v),
+          SatSpace v, KnownNat l) =>
+         SatSpace (SizedList l v) where
+  type Val (SizedList l v) = SizedList l (Val v)
 
 instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
   parseCWs [] = Just (mkSList [], [])
@@ -80,11 +84,10 @@ instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
                                     Nothing       -> Just (mkSList [], ys)
                   Nothing     -> Just (mkSList [], xs)
 
-instance (SymWord a, KnownNat l) => SatVar (SizedList l (SBV a)) where
+instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
   varExists = do
     let l = fromInteger $ natVal (Proxy :: Proxy l)
-    xs <- mkExistVars l
-    return $ mkSList xs
+    mkSList <$> replicateM l varExists
 
 {-|
 >>> extractSLists
@@ -96,3 +99,16 @@ extractSLists :: IO [SizedList 3 Integer]
 extractSLists = spc allSat $ \(SizedList xs :: SizedList 3 SInteger) -> do
   flip mapM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
   return $ (true :: SBool)
+
+{-|
+>>> length <$> extractSLists2
+144
+-}
+extractSLists2 :: IO [SizedList 2 V]
+extractSLists2 = spc allSat $ \(SizedList xs :: SizedList 2 SV) -> do
+  flip mapM_ xs $ \(V i c) -> constrain $ abs i .<= 1
+  return $ (true :: SBool)
+
+{-
+TBD: variable length list
+-}
