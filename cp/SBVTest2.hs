@@ -1,15 +1,16 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module SBVTest2 where
 
-import Control.Monad
+import Control.Arrow (first)
+import Control.Monad (replicateM)
 import Data.Generics
-import Data.List
+import Data.List (sort)
 import GHC.TypeLits
 
 import Data.SBV
@@ -77,12 +78,18 @@ instance (SatModel (Val (SizedList l v)), SatVar (SizedList l v),
   type Val (SizedList l v) = SizedList l (Val v)
 
 instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
-  parseCWs [] = Just (mkSList [], [])
-  parseCWs xs = case parseCWs xs of
-                  Just (a, ys) -> case parseCWs ys of
-                                    Just (as, zs) -> Just (mkSList (a:as), zs)
-                                    Nothing       -> Just (mkSList [], ys)
-                  Nothing     -> Just (mkSList [], xs)
+  parseCWs xs = (first mkSList) <$> parseCWs0 l xs
+    where
+      l = natVal (Proxy :: Proxy l)
+      parseCWs0 :: Integer -> [CW] -> Maybe ([a], [CW])
+      parseCWs0 _ [] = Just ([], [])
+      parseCWs0 0 _  = Just ([], [])
+      parseCWs0 l xs =
+        case parseCWs xs of
+         Just (a, ys) -> case parseCWs0 (l - 1) ys of
+                          Just (as, zs) -> Just (a:as, zs)
+                          Nothing       -> Just ([], ys)
+         Nothing     -> Just ([], xs)
 
 instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
   varExists = do
