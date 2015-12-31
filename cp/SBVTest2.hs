@@ -4,13 +4,13 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module SBVTest2 where
 
 import Control.Arrow (first)
-import Control.Monad (replicateM)
+import Control.Monad (forM_, replicateM)
 import Data.Generics
-import Data.List (sort)
 import GHC.TypeLits
 
 import Data.SBV
@@ -60,7 +60,9 @@ test3 = spc allSat $ \(i :: SInteger) -> return $ abs i .<= 1
 {-
 an example of user-defined container type
 -}
-data SizedList (l :: Nat) a = SizedList [a] deriving (Show, Eq, Ord)
+newtype SizedList (l :: Nat) a =
+  SizedList [a]
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 mkSList :: forall l a. KnownNat l => [a] -> SizedList l a
 mkSList xs =
@@ -104,8 +106,14 @@ instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
 -}
 extractSLists :: IO [SizedList 3 Integer]
 extractSLists = spc allSat $ \(SizedList xs :: SizedList 3 SInteger) -> do
-  flip mapM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
+  forM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
   return $ (true :: SBool)
+
+instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
+  type Val (a, b) = (Val a, Val b)
+
+instance (SatVar a, SatVar b) => SatVar (a, b) where
+  varExists = varExists >>= \a -> varExists >>= \b -> return (a, b)
 
 {-|
 >>> length <$> extractSLists2
@@ -113,7 +121,7 @@ extractSLists = spc allSat $ \(SizedList xs :: SizedList 3 SInteger) -> do
 -}
 extractSLists2 :: IO [SizedList 2 V]
 extractSLists2 = spc allSat $ \(SizedList xs :: SizedList 2 SV) -> do
-  flip mapM_ xs $ \(V i c) -> constrain $ abs i .<= 1
+  forM_ xs $ \(V i c) -> constrain $ abs i .<= 1
   return $ (true :: SBool)
 
 {-
