@@ -6,7 +6,7 @@
 module SBVExts
        ( SatSpace, Val
        , SatVar (..)
-       , spc, allSat'
+       , allSat', allSatWith'
        ) where
 
 import Data.Generics
@@ -103,6 +103,6 @@ instance (SatModel a, SymWord a) => SatSpace (SBV a) where
 allSat' :: SatSpace a => (a -> Predicate) -> IO [Val a]
 allSat' p = (allSat $ varExists >>= p) >>= return . extractModels
 
-spc :: SatSpace a =>
-       (Predicate -> IO AllSatResult) -> (a -> Predicate) -> IO [Val a]
-spc op p = (op $ varExists >>= p) >>= return . extractModels
+allSatWith' :: SatSpace a => SMTConfig -> (a -> Predicate) -> IO [Val a]
+allSatWith' config p =
+  (allSatWith config $ varExists >>= p) >>= return . extractModels

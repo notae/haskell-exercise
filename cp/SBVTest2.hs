@@ -48,14 +48,14 @@ test1 = allSat' $ \((V i c) :: SV) -> return $ abs i .<= 1
 True
 -}
 test2 :: IO [V]
-test2 = spc allSat $ \((V i c) :: SV) -> return $ abs i .<= 1
+test2 = allSat' $ \((V i c) :: SV) -> return $ abs i .<= 1
 
 {-|
 >>> test3
 [-1,0,1]
 -}
 test3 :: IO [Integer]
-test3 = spc allSat $ \(i :: SInteger) -> return $ abs i .<= 1
+test3 = allSat' $ \(i :: SInteger) -> return $ abs i .<= 1
 
 {-
 an example of user-defined container type
@@ -105,7 +105,7 @@ instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
 8
 -}
 extractSLists :: IO [SizedList 3 Integer]
-extractSLists = spc allSat $ \(SizedList xs :: SizedList 3 SInteger) -> do
+extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
   forM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
   return $ (true :: SBool)
 
@@ -120,7 +120,7 @@ instance (SatVar a, SatVar b) => SatVar (a, b) where
 144
 -}
 extractSLists2 :: IO [SizedList 2 V]
-extractSLists2 = spc allSat $ \(SizedList xs :: SizedList 2 SV) -> do
+extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
   forM_ xs $ \(V i c) -> constrain $ abs i .<= 1
   return $ (true :: SBool)
 
