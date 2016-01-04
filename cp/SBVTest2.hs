@@ -11,6 +11,7 @@ module SBVTest2 where
 import Control.Arrow (first)
 import Control.Monad (forM_, replicateM)
 import Data.Generics
+import Data.List (sort)
 import GHC.TypeLits
 
 import Data.SBV
@@ -109,12 +110,6 @@ extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
   forM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
   return $ (true :: SBool)
 
-instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
-  type Val (a, b) = (Val a, Val b)
-
-instance (SatVar a, SatVar b) => SatVar (a, b) where
-  varExists = varExists >>= \a -> varExists >>= \b -> return (a, b)
-
 {-|
 >>> length <$> extractSLists2
 144
@@ -127,3 +122,9 @@ extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
 {-
 TBD: variable length list
 -}
+
+instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
+  type Val (a, b) = (Val a, Val b)
+
+instance (SatVar a, SatVar b) => SatVar (a, b) where
+  varExists = varExists >>= \a -> varExists >>= \b -> return (a, b)
