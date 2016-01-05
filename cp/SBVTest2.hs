@@ -1,17 +1,17 @@
 {-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveTraversable    #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module SBVTest2 where
 
 import Control.Arrow (first)
 import Control.Monad (forM_, replicateM)
 import Data.Generics
-import Data.List (sort, sortBy, sortOn)
+import Data.List     (sort, sortBy)
 import GHC.TypeLits
 
 import Data.SBV
