@@ -16,6 +16,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
+  Default-Language:  Haskell2010
+  GHC-Options:       -Wall -fno-warn-deprecations
   exposed-modules:     TypedCP
                      , TypedCP2
                      , RangedInt
