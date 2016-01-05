@@ -119,9 +119,60 @@ extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
   forM_ xs $ \(V i c) -> constrain $ abs i .<= 1
   return $ (true :: SBool)
 
-{-
-TBD: variable length list
+{-|
+returned only existential variables
+>>> testForAll
+[0,-1,-2]
 -}
+testForAll :: IO [Integer]
+testForAll = do
+  r <- allSat $ do
+    (x :: SInteger) <- exists "x"
+    constrain $ -2 .<= x &&& x .<= 3
+    y <- forall "y"
+    return $ y * y .>= x
+  return $ extractModels r
+
+-- error "Existential arrays are not currently supported."
+testForAll2 = do
+  allSat $ \(a :: SArray Integer Integer) -> do
+    i <- forall_
+    constrain $ readArray a i .== literal 1
+    return (true :: SBool)
+  -- return $ extractModels r
+
+{-
+variable length list
+  with dummy values (representing empty elements)
+
+>>> sort <$> testVList
+[[1,2,5,1,0],[1,2,5,1,2],[1,2,5,1,3],[1,2,5,1,4],[1,2,5,1,5],[1,2,5,1,6],[1,2,5,1,7],[1,3,6,2,5],[1,4,1,0,0],[1,4,1,2,5],[1,4,1,3,6],[1,4,1,4,1],[1,4,1,5,1],[1,4,1,6,2],[1,4,1,7,3],[1,5,1,0,0],[1,5,1,2,5],[1,5,1,3,6],[1,5,1,4,1],[1,5,1,5,1],[1,5,1,6,2],[1,5,1,7,3],[1,6,2,5,1],[1,7,3,6,2]]
+-}
+testVList :: IO [[Integer]]
+testVList = do
+  r <- allSat $ do
+    -- encoding for variable length list
+    let empty = 0
+        minLen = 3
+        maxLen = 5
+    (xs :: [SInteger]) <- mkExistVars maxLen
+    let pair = zip xs (tail xs)
+    forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
+    forM_ pair $ \(p, n) -> do
+      constrain $ p .== empty ==> n .== empty
+    -- domain specific constraints
+    forM_ xs $ \x -> constrain $ x `inRange` (0, 7)
+    constrain $ head xs .== 1
+    forM_ pair $ \(p, n) -> do
+      constrain $ p .== 1 ==> n ./= 1
+      constrain $ p .== 4 ==> n .== 1
+      constrain $ p .== 7 ==> n .== 3
+      constrain $ p .== 3 ==> n .== 6
+      constrain $ p .== 6 ==> n .== 2
+      constrain $ p .== 2 ==> n .== 5
+      constrain $ p .== 5 ==> n .== 1
+    return $ (true :: SBool)
+  return $ extractModels r
 
 instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
   type Val (a, b) = (Val a, Val b)
