@@ -146,7 +146,7 @@ variable length list
   with dummy values (representing empty elements)
 
 >>> sort <$> testVList
-[[1,2,5,1,0],[1,2,5,1,2],[1,2,5,1,3],[1,2,5,1,4],[1,2,5,1,5],[1,2,5,1,6],[1,2,5,1,7],[1,3,6,2,5],[1,4,1,0,0],[1,4,1,2,5],[1,4,1,3,6],[1,4,1,4,1],[1,4,1,5,1],[1,4,1,6,2],[1,4,1,7,3],[1,5,1,0,0],[1,5,1,2,5],[1,5,1,3,6],[1,5,1,4,1],[1,5,1,5,1],[1,5,1,6,2],[1,5,1,7,3],[1,6,2,5,1],[1,7,3,6,2]]
+[[1,2,5,1,0,0],[1,4,1,0,0,0],[1,4,1,4,1,0],[1,4,1,5,1,0],[1,5,1,0,0,0],[1,5,1,4,1,0],[1,5,1,5,1,0],[1,6,2,5,1,0]]
 -}
 testVList :: IO [[Integer]]
 testVList = do
@@ -155,7 +155,8 @@ testVList = do
     let empty = 0
         minLen = 3
         maxLen = 5
-    (xs :: [SInteger]) <- mkExistVars maxLen
+    (xs :: [SInteger]) <- mkExistVars (maxLen + 1)
+    constrain $ last xs .== empty
     let pair = zip xs (tail xs)
     forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
     forM_ pair $ \(p, n) -> do
