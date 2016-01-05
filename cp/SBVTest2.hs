@@ -11,7 +11,7 @@ module SBVTest2 where
 import Control.Arrow (first)
 import Control.Monad (forM_, replicateM)
 import Data.Generics
-import Data.List (sort)
+import Data.List (sort, sortBy, sortOn)
 import GHC.TypeLits
 
 import Data.SBV
@@ -81,7 +81,7 @@ instance (SatModel (Val (SizedList l v)), SatVar (SizedList l v),
   type Val (SizedList l v) = SizedList l (Val v)
 
 instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
-  parseCWs xs = (first mkSList) <$> parseCWs0 l xs
+  parseCWs xs = first mkSList <$> parseCWs0 l xs
     where
       l = natVal (Proxy :: Proxy l)
       parseCWs0 :: Integer -> [CW] -> Maybe ([a], [CW])
@@ -108,7 +108,7 @@ instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
 extractSLists :: IO [SizedList 3 Integer]
 extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
   forM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
-  return $ (true :: SBool)
+  return (true :: SBool)
 
 {-|
 >>> length <$> extractSLists2
@@ -117,7 +117,7 @@ extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
 extractSLists2 :: IO [SizedList 2 V]
 extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
   forM_ xs $ \(V i c) -> constrain $ abs i .<= 1
-  return $ (true :: SBool)
+  return (true :: SBool)
 
 {-|
 returned only existential variables
@@ -134,7 +134,7 @@ testForAll = do
   return $ extractModels r
 
 -- error "Existential arrays are not currently supported."
-testForAll2 = do
+testForAll2 =
   allSat $ \(a :: SArray Integer Integer) -> do
     i <- forall_
     constrain $ readArray a i .== literal 1
@@ -142,38 +142,47 @@ testForAll2 = do
   -- return $ extractModels r
 
 {-
-variable length list
+encode and decode variable length list
   with dummy values (representing empty elements)
 
->>> sort <$> testVList
-[[1,2,5,1,0,0],[1,4,1,0,0,0],[1,4,1,4,1,0],[1,4,1,5,1,0],[1,5,1,0,0,0],[1,5,1,4,1,0],[1,5,1,5,1,0],[1,6,2,5,1,0]]
+>>> sortVList <$> testVList
+[[1,4,1],[1,5,1],[1,2,5,1],[1,4,1,4,1],[1,4,1,5,1],[1,5,1,4,1],[1,5,1,5,1],[1,6,2,5,1]]
 -}
 testVList :: IO [[Integer]]
 testVList = do
-  r <- allSat $ do
-    -- encoding for variable length list
-    let empty = 0
-        minLen = 3
-        maxLen = 5
-    (xs :: [SInteger]) <- mkExistVars (maxLen + 1)
-    constrain $ last xs .== empty
-    let pair = zip xs (tail xs)
-    forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
-    forM_ pair $ \(p, n) -> do
-      constrain $ p .== empty ==> n .== empty
-    -- domain specific constraints
-    forM_ xs $ \x -> constrain $ x `inRange` (0, 7)
-    constrain $ head xs .== 1
-    forM_ pair $ \(p, n) -> do
-      constrain $ p .== 1 ==> n ./= 1
-      constrain $ p .== 4 ==> n .== 1
-      constrain $ p .== 7 ==> n .== 3
-      constrain $ p .== 3 ==> n .== 6
-      constrain $ p .== 6 ==> n .== 2
-      constrain $ p .== 2 ==> n .== 5
-      constrain $ p .== 5 ==> n .== 1
-    return $ (true :: SBool)
-  return $ extractModels r
+  r <- allSat pred
+  return $ takeWhile (/= emptyElem) <$> extractModels r
+  where
+    emptyElem = 0
+    pred = do
+      -- encoding for variable length list
+      let empty = literal emptyElem
+          minLen = 3
+          maxLen = 5
+      (xs :: [SInteger]) <- mkExistVars (maxLen + 1)
+      constrain $ last xs .== empty
+      let pair = zip xs (tail xs)
+      forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
+      forM_ pair $ \(p, n) -> constrain $ p .== empty ==> n .== empty
+      -- domain specific constraints
+      forM_ xs $ \x -> constrain $ x `inRange` (0, 7)
+      constrain $ head xs .== 1
+      forM_ pair $ \(p, n) -> do
+        constrain $ p .== 1 ==> n ./= 1
+        constrain $ p .== 4 ==> n .== 1
+        constrain $ p .== 7 ==> n .== 3
+        constrain $ p .== 3 ==> n .== 6
+        constrain $ p .== 6 ==> n .== 2
+        constrain $ p .== 2 ==> n .== 5
+        constrain $ p .== 5 ==> n .== 1
+      return (true :: SBool)
+
+sortVList :: Ord a => [[a]] -> [[a]]
+sortVList = sortBy f where
+  f :: Ord a => [a] -> [a] -> Ordering
+  f xs ys = case compare (length xs) (length ys) of
+    EQ -> compare xs ys
+    ord -> ord
 
 instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
   type Val (a, b) = (Val a, Val b)
