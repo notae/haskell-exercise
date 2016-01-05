@@ -141,7 +141,7 @@ testForAll2 =
     return (true :: SBool)
   -- return $ extractModels r
 
-{-
+{-|
 encode and decode variable length list
   with dummy values (representing empty elements)
 
