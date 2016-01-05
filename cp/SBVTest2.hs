@@ -11,7 +11,7 @@ module SBVTest2 where
 import Control.Arrow (first)
 import Control.Monad (forM_, replicateM)
 import Data.Generics
-import Data.List     (sort, sortBy)
+import Data.List     (nub, sort, sortBy)
 import GHC.TypeLits
 
 import Data.SBV
@@ -164,6 +164,7 @@ testVList = do
       let pair = zip xs (tail xs)
       forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
       forM_ pair $ \(p, n) -> constrain $ p .== empty ==> n .== empty
+
       -- domain specific constraints
       forM_ xs $ \x -> constrain $ x `inRange` (0, 7)
       constrain $ head xs .== 1
@@ -183,6 +184,45 @@ sortVList = sortBy f where
   f xs ys = case compare (length xs) (length ys) of
     EQ -> compare xs ys
     ord -> ord
+
+{-|
+encode and decode variable length list without dummy values
+
+>>> sortVList <$> testVList2
+[[1,4,1],[1,5,1],[1,2,5,1],[1,4,1,4,1],[1,4,1,5,1],[1,5,1,4,1],[1,5,1,5,1],[1,6,2,5,1]]
+-}
+testVList2 :: IO [[Word8]]
+testVList2 = do
+  r <- allSat pred
+  return $ decode <$> extractModels r
+  where
+    decode :: (Integer, [Word8]) -> [Word8]
+    decode (n, xs) = take (fromInteger n) xs
+    pred = do
+      -- encoding for variable length list
+      let minLen = 3
+          maxLen = 5
+      (l :: SInteger) <- exists_
+      (xs :: [SWord8]) <- mkExistVars (fromInteger maxLen)
+      constrain $ l `inRange` (literal minLen, literal maxLen)
+      forM_ (zip xs [0 .. maxLen-1]) $
+        \(x, i) -> constrain $ literal i .>= l ==> x .== 1
+
+      -- domain specific constraints
+      forM_ xs $ \x -> constrain $ x `inRange` (1, 7)
+      constrain $ head xs .== 1
+      constrain $ select xs 0 (l - 1) .== 1
+      let pair = zip xs (tail xs)
+      forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) -> do
+        constrain $ literal i .< l-1 ==> (
+          (p ./= n) &&&
+          (p .== 4 ==> n .== 1) &&&
+          (p .== 7 ==> n .== 3) &&&
+          (p .== 3 ==> n .== 6) &&&
+          (p .== 6 ==> n .== 2) &&&
+          (p .== 2 ==> n .== 5) &&&
+          (p .== 5 ==> n .== 1) )
+      return (true :: SBool)
 
 instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
   type Val (a, b) = (Val a, Val b)
