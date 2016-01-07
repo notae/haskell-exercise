@@ -197,22 +197,23 @@ testVList2 = do
   r <- allSat constraints
   return $ decode <$> extractModels r
   where
-    decode :: (Integer, [Word8]) -> [Word8]
-    decode (n, xs) = take (fromInteger n) xs
+    decode :: (Word8, [Word8]) -> [Word8]
+    decode (n, xs) = take (fromInteger . toInteger $ n) xs
     constraints = do
       -- encoding for variable length list
       let minLen = 3
-          maxLen = 5
-      (l :: SInteger) <- exists_
-      (xs :: [SWord8]) <- mkExistVars (fromInteger maxLen)
+          maxLen = 5 :: Word8
+      (l :: SWord8) <- exists_
+      (xs :: [SWord8]) <- mkExistVars (fromInteger . toInteger $ maxLen)
       constrain $ l `inRange` (literal minLen, literal maxLen)
       forM_ (zip xs [0 .. maxLen-1]) $
-        \(x, i) -> constrain $ literal i .>= l ==> x .== 1
+        \(x, i) -> constrain $
+                   literal i .>= l ==> x .== select xs minBound (l - 1)
 
       -- domain specific constraints
       forM_ xs $ \x -> constrain $ x `inRange` (1, 7)
       constrain $ head xs .== 1
-      constrain $ select xs 0 (l - 1) .== 1
+      constrain $ select xs minBound (l - 1) .== 1
       let pair = zip xs (tail xs)
       forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) ->
         constrain $ literal i .< l-1 ==> (
