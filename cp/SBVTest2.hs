@@ -11,7 +11,7 @@ module SBVTest2 where
 import Control.Arrow (first)
 import Control.Monad (forM_, replicateM)
 import Data.Generics
-import Data.List     (nub, sort, sortBy)
+import Data.List     (sort, sortBy)
 import GHC.TypeLits
 
 import Data.SBV
@@ -42,14 +42,14 @@ instance SatSpace SV where
 [V {vi = -1, vc = Red},V {vi = 0, vc = Green},V {vi = 1, vc = Blue},V {vi = -1, vc = Yellow},V {vi = 1, vc = Red},V {vi = -1, vc = Green},V {vi = 0, vc = Red},V {vi = 1, vc = Yellow},V {vi = 1, vc = Green},V {vi = 0, vc = Yellow},V {vi = 0, vc = Blue},V {vi = -1, vc = Blue}]
 -}
 test1 :: IO [V]
-test1 = allSat' $ \((V i c) :: SV) -> return $ abs i .<= 1
+test1 = allSat' $ \((V i _) :: SV) -> return $ abs i .<= 1
 
 {-|
 >>> (==) <$> test1 <*> test2
 True
 -}
 test2 :: IO [V]
-test2 = allSat' $ \((V i c) :: SV) -> return $ abs i .<= 1
+test2 = allSat' $ \((V i _) :: SV) -> return $ abs i .<= 1
 
 {-|
 >>> test3
@@ -81,15 +81,15 @@ instance (SatModel (Val (SizedList l v)), SatVar (SizedList l v),
   type Val (SizedList l v) = SizedList l (Val v)
 
 instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
-  parseCWs xs = first mkSList <$> parseCWs0 l xs
+  parseCWs xs0 = first mkSList <$> parseCWs0 l xs0
     where
       l = natVal (Proxy :: Proxy l)
       parseCWs0 :: Integer -> [CW] -> Maybe ([a], [CW])
       parseCWs0 _ [] = Just ([], [])
       parseCWs0 0 _  = Just ([], [])
-      parseCWs0 l xs =
+      parseCWs0 i xs =
         case parseCWs xs of
-         Just (a, ys) -> case parseCWs0 (l - 1) ys of
+         Just (a, ys) -> case parseCWs0 (i - 1) ys of
                           Just (as, zs) -> Just (a:as, zs)
                           Nothing       -> Just ([], ys)
          Nothing     -> Just ([], xs)
@@ -116,7 +116,7 @@ extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
 -}
 extractSLists2 :: IO [SizedList 2 V]
 extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
-  forM_ xs $ \(V i c) -> constrain $ abs i .<= 1
+  forM_ xs $ \(V i _) -> constrain $ abs i .<= 1
   return (true :: SBool)
 
 {-|
@@ -134,6 +134,7 @@ testForAll = do
   return $ extractModels r
 
 -- error "Existential arrays are not currently supported."
+testForAll2 :: IO AllSatResult
 testForAll2 =
   allSat $ \(a :: SArray Integer Integer) -> do
     i <- forall_
@@ -150,20 +151,20 @@ encode and decode variable length list
 -}
 testVList :: IO [[Integer]]
 testVList = do
-  r <- allSat pred
+  r <- allSat constraints
   return $ takeWhile (/= emptyElem) <$> extractModels r
   where
     emptyElem = 0
-    pred = do
+    constraints = do
       -- encoding for variable length list
-      let empty = literal emptyElem
+      let e = literal emptyElem
           minLen = 3
           maxLen = 5
       (xs :: [SInteger]) <- mkExistVars (maxLen + 1)
-      constrain $ last xs .== empty
+      constrain $ last xs .== e
       let pair = zip xs (tail xs)
-      forM_ (take minLen xs) $ \x -> constrain $ x ./= empty
-      forM_ pair $ \(p, n) -> constrain $ p .== empty ==> n .== empty
+      forM_ (take minLen xs) $ \x -> constrain $ x ./= e
+      forM_ pair $ \(p, n) -> constrain $ p .== e ==> n .== e
 
       -- domain specific constraints
       forM_ xs $ \x -> constrain $ x `inRange` (0, 7)
@@ -193,12 +194,12 @@ encode and decode variable length list without dummy values
 -}
 testVList2 :: IO [[Word8]]
 testVList2 = do
-  r <- allSat pred
+  r <- allSat constraints
   return $ decode <$> extractModels r
   where
     decode :: (Integer, [Word8]) -> [Word8]
     decode (n, xs) = take (fromInteger n) xs
-    pred = do
+    constraints = do
       -- encoding for variable length list
       let minLen = 3
           maxLen = 5
@@ -213,7 +214,7 @@ testVList2 = do
       constrain $ head xs .== 1
       constrain $ select xs 0 (l - 1) .== 1
       let pair = zip xs (tail xs)
-      forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) -> do
+      forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) ->
         constrain $ literal i .< l-1 ==> (
           (p ./= n) &&&
           (p .== 4 ==> n .== 1) &&&

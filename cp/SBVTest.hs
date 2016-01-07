@@ -36,6 +36,7 @@ Solution #4:
   s2 = 5 :: Integer
 Found 4 different solutions.
 -}
+allSatPyt :: SInteger -> IO AllSatResult
 allSatPyt = allSat . pyt
 
 {-|
@@ -113,7 +114,7 @@ Extract tuple values. These are *not* type-checked at compile time.
 -}
 extractTuples :: IO [(Integer, Color)]
 extractTuples = do
-  r <- allSat $ \(x::SInteger, c::SColor) -> abs x .<= 1
+  r <- allSat $ \(x::SInteger, _::SColor) -> abs x .<= 1
   return $ extractModels r
 
 {-|

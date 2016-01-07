@@ -9,8 +9,6 @@ module SBVExts
        , allSat', allSatWith'
        ) where
 
-import Data.Generics
-
 import Data.SBV
 
 {-
