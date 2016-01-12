@@ -35,7 +35,7 @@ newtype R a = R { unR :: a }
 instance Symantics R i where
   int x     = R x
   add e1 e2 = R $ unR e1 + unR e2
-  eq e1 e2  = R $ fromBool $ unR e1 == unR e2
+  eq e1 e2  = R $ unR e1 == unR e2
   lam f     = R $ unR . f . R
   app e1 e2 = R $ (unR e1) (unR e2)
 
@@ -48,15 +48,18 @@ instance SymWord i => Symantics SBV i where
 --   lam f     = R $ unR . f . R
 --   app e1 e2 = R $ (unR e1) (unR e2)
 
-
+-- predicate in tag-less final representation
 p :: Symantics repl Word8 => repl Word8 -> repl Bool
 p x = (int 2 `add` x) `eq` int 5
 
+-- print
 s :: String
 s = unS (p (int 3)) 0
 
+-- solve as constraints
 r :: IO AllSatResult
 r = allSat (p :: SWord8 -> SBool)
 
+-- evaluate as Haskell expression
 v :: Bool
 v = unR $ p (int 3)
