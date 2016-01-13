@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module SBVTest3 where
 
@@ -35,17 +36,15 @@ instance Symantics S where
   app e1 e2 = S $ \h ->
     "(" ++ unS e1 h ++ " " ++ unS e2 h ++ ")"
 
-newtype R a = R { unR :: a }
+newtype V a = V { unV :: a } deriving (Show, Num)
 
-instance Symantics R where
-  type Ctx R a = Num a
-  int x     = R x
-  add e1 e2 = R $ unR e1 + unR e2
-  eq e1 e2  = R $ unR e1 == unR e2
-  lam f     = R $ unR . f . R
-  app e1 e2 = R $ (unR e1) (unR e2)
-
--- newtype RSBV a = RSBV { unRSBV :: a }
+instance Symantics V where
+  type Ctx V a = Num a
+  int x     = V x
+  add e1 e2 = V $ unV e1 + unV e2
+  eq e1 e2  = V $ unV e1 == unV e2
+  lam f     = V $ unV . f . V
+  app e1 e2 = V $ (unV e1) (unV e2)
 
 instance Symantics SBV where
   type Ctx SBV a = (Num a, SymWord a)
@@ -83,4 +82,29 @@ evaluate as Haskell expression
 True
 -}
 v :: Bool
-v = unR $ p (int 3)
+v = unV $ p (int 3)
+
+
+class Eq2 repl where
+  infix 4 @==, @/=
+  (@==) :: Eq a => repl a -> repl a -> repl Bool
+  (@/=) :: Eq a => repl a -> repl a -> repl Bool
+
+instance Eq2 V where
+  V x @== V y = V $ x == y
+  V x @/= V y = V $ x /= y
+
+instance Eq2 SBV where
+  (@==) = (.==)
+  (@/=) = (./=)
+
+{-|
+>>> unV $ p2 3
+True
+>>> allSat (p2 :: SWord8 -> SBool)
+Solution #1:
+  s0 = 3 :: Word8
+This is the only solution.
+-}
+p2 :: (Num (repl Word8), Eq2 repl) => repl Word8 -> repl Bool
+p2 x = 2 + x @== 5
