@@ -1,26 +1,10 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-
 module SBVTest3 where
 
 import Data.Functor.Identity
 
 import Data.SBV
 
-class Eq2 repl where
-  infix 4 @==, @/=
-  (@==) :: Eq a => repl a -> repl a -> repl Bool
-  (@/=) :: Eq a => repl a -> repl a -> repl Bool
-
-instance Eq2 Identity where
-  (@==) = \x y -> (==) <$> x <*> y
-  (@/=) = \x y -> (/=) <$> x <*> y
-
-instance Eq2 SBV where
-  (@==) = (.==)
-  (@/=) = (./=)
-
-deriving instance Num a => Num (Identity a)
+import SBVExts2
 
 {-|
 >>> runIdentity $ p2 3
@@ -60,3 +44,49 @@ p4 x y = do
   constrain $ y `inRange` (3, 5)
   constrain $ p3 x y
   return true
+
+
+p0 :: SWord8 -> Symbolic SBool
+p0 x = do
+  constrain $ x `inRange` (0, 2)
+  return $ x * x .== 1
+
+t0 = allSat p0
+
+
+newtype M a = M { unM :: a }
+            deriving (Show, Read, Eq, Ord)
+
+-- instance Applicative M where
+--   pure = M
+--   M f <*> M a = mkM $ f a
+
+type SM a = SBV (M a)
+
+-- instance Eq2 M where
+--   M x @== M y = x @== y
+
+-- TBD: store into the type
+mm :: Num a => a
+mm = 3
+
+mkM :: (Num a, SDivisible a) => a -> M a
+mkM a = M $ a `sMod` mm
+
+instance (Num a, SDivisible a) => Num (M a) where
+  fromInteger = mkM . fromInteger
+  M x + M y    = mkM $ x + y
+  M x * M y    = mkM $ x * y
+  abs    (M x) = mkM $ abs x
+  signum (M x) = mkM $ signum x
+  negate (M x) = mkM $ negate x
+
+-- liftOpM :: (a -> a -> b) -> M
+
+p1 :: SWord8 -> Symbolic SBool
+p1 x = do
+  constrain $ x `inRange` (0, mm - 1)
+--   return $ unM $ (@==) <$> mkM x * mkM x <*> mkM 1
+  return $ unM (mkM x * mkM x) @== 1
+
+t1 = allSat p1
