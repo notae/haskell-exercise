@@ -43,3 +43,4 @@ instance Ord2 SBV where
 -}
 
 deriving instance Num a => Num (Identity a)
+deriving instance SDivisible a => SDivisible (Identity a)

@@ -81,12 +81,34 @@ instance (Num a, SDivisible a) => Num (M a) where
   signum (M x) = mkM $ signum x
   negate (M x) = mkM $ negate x
 
--- liftOpM :: (a -> a -> b) -> M
+liftOpM :: (a -> a -> b) -> M a -> M a -> b
+liftOpM f (M x) (M y) = f x y
 
-p1 :: SWord8 -> Symbolic SBool
-p1 x = do
+newM :: Symbolic (M SWord8)
+newM = do
+  x <- free_
   constrain $ x `inRange` (0, mm - 1)
---   return $ unM $ (@==) <$> mkM x * mkM x <*> mkM 1
-  return $ unM (mkM x * mkM x) @== 1
+  return $ mkM x
 
+p1 :: Symbolic SBool
+p1 = do
+  x <- newM
+  return $ p11 x
+
+{-|
+>>> runIdentity $ p11 (mkM 2)
+True
+-}
+p11 :: (Num (repl Word8), SDivisible (repl Word8), Eq2 repl) =>
+       M (repl Word8) -> repl Bool
+p11 x = liftOpM (@==) (x * x) 1
+
+{-|
+>>> t1
+Solution #1:
+  s0 = 2 :: Word8
+Solution #2:
+  s0 = 1 :: Word8
+Found 2 different solutions.
+-}
 t1 = allSat p1
