@@ -45,15 +45,25 @@ p4 x y = do
   constrain $ p3 x y
   return true
 
-
+{-|
+Encode residue field with type Word8
+>>> allSat p0
+Solution #1:
+  s0 = 1 :: Word8
+Solution #2:
+  s0 = 2 :: Word8
+Found 2 different solutions.
+-}
 p0 :: SWord8 -> Symbolic SBool
 p0 x = do
   constrain $ x `inRange` (0, 2)
-  return $ x * x .== 1
+  return $ (x * x) `sMod` mm .== 1
 
 t0 = allSat p0
 
-
+{-
+Define residue field as newtype
+-}
 newtype M a = M { unM :: a }
             deriving (Show, Read, Eq, Ord)
 
@@ -96,6 +106,7 @@ p1 = do
   return $ p11 x
 
 {-|
+Apply as normal Haskell function:
 >>> runIdentity $ p11 (mkM 2)
 True
 -}
@@ -104,6 +115,7 @@ p11 :: (Num (repl Word8), SDivisible (repl Word8), Eq2 repl) =>
 p11 x = liftOpM (@==) (x * x) 1
 
 {-|
+Apply as SBV predicate:
 >>> t1
 Solution #1:
   s0 = 2 :: Word8
