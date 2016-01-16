@@ -178,6 +178,9 @@ Solution #2:
 Solution #3:
   s0 = 2 :: Word4
 Found 3 different solutions.
+
+>>> (allSat $ \(x::SMod) -> x .== x) >>= \r -> return $ extractModels r :: IO [Mod]
+[0,1,2]
 -}
 
 {-|
@@ -187,4 +190,7 @@ Solution #1:
 Solution #2:
   s0 = 2 :: Word4
 Found 2 different solutions.
+
+>>> (allSat $ \(x::SMod) -> x * x .== 1) >>= \r -> return $ extractModels r :: IO [Mod]
+[1,2]
 -}
