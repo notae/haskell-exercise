@@ -110,8 +110,9 @@ type SMod = SBV Mod
 svMM :: SMod
 svMM = literal (Mod mm)
 
+-- | Size enough for result of multiplication
 modBits :: Int
-modBits = ceiling (log mm / log 2 * 2)
+modBits = ceiling (logBase 2 mm * 2 :: Float)
 
 modKind :: Kind
 modKind = KBounded False modBits
@@ -121,9 +122,7 @@ instance SymWord Mod where
 --   mkSymWord q n = genMkSymVar modKind q n
   mkSymWord q n = do
     x <- genMkSymVar modKind q n
-    -- constrain $ x .<= mm-1
     constrain $ x .<= literal (modm (mm-1))
-    -- constrain true
     return x
   literal    = genLiteral modKind
   fromCW     = genFromCW
