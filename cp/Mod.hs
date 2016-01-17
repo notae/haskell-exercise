@@ -79,24 +79,6 @@ instance Integral Mod where
     where (q, r) = quotRem x y
   toInteger (Mod x) = toInteger x
 
--- | Bits instance (TBD)
-instance Bits Mod where
-  Mod x  .&.  Mod y = Mod (x  .&.  y)
-  Mod x  .|.  Mod y = Mod (x  .|.  y)
-  Mod x `xor` Mod y = Mod (x `xor` y)
-  complement (Mod x)  = Mod (x `xor` 2^modBits-1)
-  Mod x `shift`  i    = modm (shift x i)
-  Mod x `shiftL` i    = modm (shiftL x i)
-  Mod x `shiftR` i    = Mod (shiftR x i)
-  Mod x `rotate` i    = modm (x `shiftL` k .|. x `shiftR` (modBits-k))
-                            where k = i .&. (2^modBits-1)
-  bitSize _             = modBits
-  bitSizeMaybe _        = Just modBits
-  isSigned _            = False
-  testBit (Mod x)     = testBit x
-  bit i                 = modm (bit i)
-  popCount (Mod x)    = popCount x
-
 -- | Random instance, used in quick-check
 instance Random Mod where
   randomR (Mod lo, Mod hi) gen = (Mod x, gen')
@@ -153,16 +135,3 @@ instance {-# OVERLAPPING #-} Num SMod where
 instance SDivisible SMod where
   sQuotRem = liftQRem
   sDivMod  = liftDMod
-
--- | SIntegral instance, using default methods
-instance SIntegral Mod
-
--- | Conversion from bits
-instance FromBits SMod where
-  fromBitsLE = checkAndConvert modBits
-
--- | Joining/splitting to/from Word8
-instance Splittable Word8 Mod where
-  split x = (Mod (x `shiftR` modBits), modm x)
-  Mod x # Mod y = (x `shiftL` modBits) .|. y
-  extend (Mod x)  = x
