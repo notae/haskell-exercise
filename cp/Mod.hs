@@ -167,30 +167,3 @@ instance Splittable Word8 Mod where
   split x = (Mod (x `shiftR` modBits), modm x)
   Mod x # Mod y = (x `shiftL` modBits) .|. y
   extend (Mod x)  = x
-
-{-|
->>> :set -XScopedTypeVariables
->>> allSat $ \(x::SMod) -> x .== x
-Solution #1:
-  s0 = 0 :: Word4
-Solution #2:
-  s0 = 1 :: Word4
-Solution #3:
-  s0 = 2 :: Word4
-Found 3 different solutions.
-
->>> (allSat $ \(x::SMod) -> x .== x) >>= \r -> return $ extractModels r :: IO [Mod]
-[0,1,2]
--}
-
-{-|
->>> allSat $ \(x::SMod) -> x * x .== 1
-Solution #1:
-  s0 = 1 :: Word4
-Solution #2:
-  s0 = 2 :: Word4
-Found 2 different solutions.
-
->>> (allSat $ \(x::SMod) -> x * x .== 1) >>= \r -> return $ extractModels r :: IO [Mod]
-[1,2]
--}
