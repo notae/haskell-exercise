@@ -102,7 +102,7 @@ instance Random Mod where
   randomR (Mod lo, Mod hi) gen = (Mod x, gen')
     where (x, gen') = randomR (lo, hi) gen
   random gen = (Mod x, gen')
-    where (x, gen') = randomR (0, 2^modBits-1) gen
+    where (x, gen') = randomR (0, mm-1) gen
 
 -- | SMod type synonym
 type SMod = SBV Mod
@@ -119,7 +119,6 @@ modKind = KBounded False modBits
 
 -- | SymWord instance, allowing this type to be used in proofs/sat etc.
 instance SymWord Mod where
---   mkSymWord q n = genMkSymVar modKind q n
   mkSymWord q n = do
     x <- genMkSymVar modKind q n
     constrain $ x .<= literal (modm (mm-1))
