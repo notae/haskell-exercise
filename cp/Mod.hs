@@ -125,8 +125,8 @@ instance SDivisible Mod where
 
 instance {-# OVERLAPPING #-} Num SMod where
   fromInteger = literal . fromInteger
-  SBV x + SBV y = SBV (svPlus x y) `sMod` literal (Mod mm)
-  SBV x * SBV y = SBV (svTimes x y) `sMod` literal (Mod mm)
+  SBV x + SBV y = SBV (svPlus x y) `sMod` svMM
+  SBV x * SBV y = SBV (svTimes x y) `sMod` svMM
   abs = id  -- donothing since the value is always non-negative
   signum x = ite (x .== 0) (literal 0) (literal 1)
   negate _ = error "Num.SMod.negate: not supported"
