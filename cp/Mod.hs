@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
@@ -7,50 +9,52 @@
 Modular arithmetic based on Data.SBV.Examples.Misc.Word4
 -}
 
-module Mod where
+module Mod
+       ( Mod
+       , SMod
+       ) where
 
-import GHC.Enum (boundedEnumFrom, boundedEnumFromThen, predError, succError,
-                 toEnumError)
-
-import Data.Bits
 import Data.Generics (Data, Typeable)
+import Data.Proxy
+import GHC.Enum      (boundedEnumFrom, boundedEnumFromThen, predError,
+                      succError)
+import GHC.TypeLits
 import System.Random (Random (..))
 
 import Data.SBV
 import Data.SBV.Dynamic
 import Data.SBV.Internals
 
-mm :: Num a => a
-mm = 3
-
 -- | Mod as a newtype. Invariant: @Mod x@ should satisfy @x < mm@.
-newtype Mod = Mod Word8
+newtype Mod (m :: Nat) = Mod { unMod :: Word8 }
   deriving (Eq, Ord, Data, Typeable)
 
+mm :: forall m. KnownNat m => Mod m
+mm = Mod . fromInteger . natVal $ (Proxy :: Proxy m)
+
 -- | Smart constructor; simplifies conversion from Word8
-modm :: Word8 -> Mod
-modm x = Mod (x `sMod` mm)
+modm :: forall m. KnownNat m => Word8 -> Mod m
+modm x = Mod (x `sMod` unMod (mm :: Mod m))
 
 -- | Show instance
-instance Show Mod where
+instance Show (Mod m) where
   show (Mod x) = show x
 
 -- | Read instance. We read as an 8-bit word, and coerce
-instance Read Mod where
+instance KnownNat m => Read (Mod m) where
   readsPrec p s = [ (modm x, s') | (x, s') <- readsPrec p s ]
 
 -- | Bounded instance; from 0 to mm-1
-instance Bounded Mod where
+instance KnownNat m => Bounded (Mod m) where
   minBound = Mod 0
-  maxBound = Mod (mm-1)
+  maxBound = mm - 1
 
 -- | Enum instance, trivial definitions.
-instance Enum Mod where
-  succ (Mod x) = if x < mm-1 then Mod (succ x) else succError "Mod"
-  pred (Mod x) = if x > 0    then Mod (pred x) else predError "Mod"
-  toEnum i | 0 <= i && i <= mm-1 = Mod (toEnum i)
-           | otherwise              = toEnumError "Mod" i (Mod 0, Mod (mm-1))
-  fromEnum (Mod x) = fromEnum x
+instance KnownNat m => Enum (Mod m) where
+  succ m@(Mod x) = if m < mm-1 then Mod (succ x) else succError "Mod"
+  pred m@(Mod x) = if m > 0    then Mod (pred x) else predError "Mod"
+  toEnum = fromInteger . toInteger
+  fromEnum = fromInteger . toInteger . unMod
   -- Comprehensions
   enumFrom                                     = boundedEnumFrom
   enumFromThen                                 = boundedEnumFromThen
@@ -58,7 +62,7 @@ instance Enum Mod where
   enumFromThenTo (Mod x) (Mod y) (Mod z) = map Mod (enumFromThenTo x y z)
 
 -- | Num instance, merely lifts underlying 8-bit operation and casts back
-instance Num Mod where
+instance KnownNat m => Num (Mod m) where
   Mod x + Mod y = modm (x + y)
   Mod x * Mod y = modm (x * y)
   Mod x - Mod y = modm (x - y)
@@ -68,62 +72,62 @@ instance Num Mod where
   fromInteger n     = modm (fromInteger n)
 
 -- | Real instance simply uses the Word8 instance
-instance Real Mod where
+instance KnownNat m => Real (Mod m) where
   toRational (Mod x) = toRational x
 
 -- | Integral instance, again using Word8 instance and casting. NB. we do
 -- not need to use the smart constructor here as neither the quotient nor
 -- the remainder can overflow a Mod.
-instance Integral Mod where
+instance KnownNat m => Integral (Mod m) where
   quotRem (Mod x) (Mod y) = (Mod q, Mod r)
     where (q, r) = quotRem x y
   toInteger (Mod x) = toInteger x
 
 -- | Random instance, used in quick-check
-instance Random Mod where
+instance KnownNat m => Random (Mod m) where
   randomR (Mod lo, Mod hi) gen = (Mod x, gen')
     where (x, gen') = randomR (lo, hi) gen
   random gen = (Mod x, gen')
-    where (x, gen') = randomR (0, mm-1) gen
+    where (x, gen') = randomR (0, unMod (mm :: Mod m) - 1) gen
 
 -- | SMod type synonym
-type SMod = SBV Mod
+type SMod m = SBV (Mod m)
 
-svMM :: SMod
-svMM = literal (Mod mm)
+svMM :: KnownNat m => SMod m
+svMM = literal mm
 
 -- | Size enough for result of multiplication
 modBits :: Int
-modBits = ceiling (logBase 2 mm * 2 :: Float)
+modBits = 8
 
 modKind :: Kind
 modKind = KBounded False modBits
 
 -- | SymWord instance, allowing this type to be used in proofs/sat etc.
-instance SymWord Mod where
+instance KnownNat m => SymWord (Mod m) where
   mkSymWord q n = do
     x <- genMkSymVar modKind q n
-    constrain $ x .<= literal (modm (mm-1))
+    constrain $ x .<= literal (modm (unMod (mm :: Mod m) - 1))
     return x
   literal    = genLiteral modKind
   fromCW     = genFromCW
 
 -- | HasKind instance; simply returning the underlying kind for the type
-instance HasKind Mod where
+instance HasKind (Mod m) where
   kindOf _ = modKind
 
 -- | SatModel instance, merely uses the generic parsing method.
-instance SatModel Mod where
+instance KnownNat m => SatModel (Mod m) where
   parseCWs = genParse modKind
 
 -- | SDvisible instance, using 0-extension
-instance SDivisible Mod where
+instance KnownNat m => SDivisible (Mod m) where
   sQuotRem x 0 = (0, x)
   sQuotRem x y = x `quotRem` y
   sDivMod  x 0 = (0, x)
   sDivMod  x y = x `divMod` y
 
-instance {-# OVERLAPPING #-} Num SMod where
+instance {-# OVERLAPPING #-} KnownNat m => Num (SMod m) where
   fromInteger = literal . fromInteger
   SBV x + SBV y = SBV (svPlus x y) `sMod` svMM
   SBV x * SBV y = SBV (svTimes x y) `sMod` svMM
@@ -132,6 +136,6 @@ instance {-# OVERLAPPING #-} Num SMod where
   negate _ = error "Num.SMod.negate: not supported"
 
 -- | SDvisible instance, using default methods
-instance SDivisible SMod where
+instance KnownNat m => SDivisible (SMod m) where
   sQuotRem = liftQRem
   sDivMod  = liftDMod
