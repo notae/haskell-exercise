@@ -60,10 +60,17 @@ p0 x = do
   constrain $ x `inRange` (0, 2)
   return $ (x * x) `sMod` mm .== 1
 
+t0 :: IO AllSatResult
 t0 = allSat p0
 
+{-
 liftOpM :: (a -> a -> b) -> M a -> M a -> b
 liftOpM f (M x) (M y) = f x y
+
+infix 4 @===
+(@===) :: (Eq a, Eq2 repl) => M (repl a) -> M (repl a) -> repl Bool
+(@===) = liftOpM (@==)
+-}
 
 newM :: Symbolic (M SWord8)
 newM = do
@@ -83,7 +90,7 @@ True
 -}
 p11 :: (Num (repl Word8), SDivisible (repl Word8), Eq2 repl) =>
        M (repl Word8) -> repl Bool
-p11 x = liftOpM (@==) (x * x) 1
+p11 x = x * x `eq3` 1
 
 {-|
 Apply as SBV predicate:
@@ -94,4 +101,5 @@ Solution #2:
   s0 = 1 :: Word8
 Found 2 different solutions.
 -}
+t1 :: IO AllSatResult
 t1 = allSat p1

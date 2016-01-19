@@ -1,6 +1,7 @@
 module Modular where
 
 import Data.SBV
+import SBVExts2
 
 {-
 Define modular arithmetic field as newtype
@@ -8,14 +9,10 @@ Define modular arithmetic field as newtype
 newtype M a = M { unM :: a }
             deriving (Show, Read, Eq, Ord)
 
--- instance Applicative M where
---   pure = M
---   M f <*> M a = mkM $ f a
+instance Eq3 M where
+  M x `eq3` M y = x @== y
 
 type SM a = SBV (M a)
-
--- instance Eq2 M where
---   M x @== M y = x @== y
 
 -- TBD: store into the type
 mm :: Num a => a
