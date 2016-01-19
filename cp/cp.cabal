@@ -40,5 +40,6 @@ library
                      , syb
                      , sbv >= 5.7
                      , random
+                     , modular-arithmetic
   -- hs-source-dirs:      
   default-language:    Haskell2010
