@@ -39,6 +39,7 @@ library
                      , operational
                      , syb
                      , sbv >= 5.7
+                     , sbvPlugin
                      , random
                      , modular-arithmetic
   -- hs-source-dirs:      
