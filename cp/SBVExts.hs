@@ -90,9 +90,11 @@ class (SatModel (Val a), SatVar a) => SatSpace a where
   type Val a
 
 class SatVar a where
+  varForall :: Symbolic a
   varExists :: Symbolic a
 
 instance SymWord a => SatVar (SBV a) where
+  varForall = forall_
   varExists = exists_
 
 instance (SatModel a, SymWord a) => SatSpace (SBV a) where

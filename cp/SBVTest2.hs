@@ -32,6 +32,7 @@ instance SatModel V where
                    return (V i c, xs)
 
 instance SatVar SV where
+  varForall = forall_ >>= \i -> forall_ >>= \c -> return $ V i c
   varExists = exists_ >>= \i -> exists_ >>= \c -> return $ V i c
 
 instance SatSpace SV where
@@ -94,6 +95,12 @@ instance (SatModel a, KnownNat l) => SatModel (SizedList l a) where
                           Nothing       -> Just ([], ys)
          Nothing     -> Just ([], xs)
 
+varSList :: forall l v. (SatVar v, KnownNat l) =>
+            Symbolic v -> Symbolic (SizedList l v)
+varSList v = do
+    let l = fromInteger $ natVal (Proxy :: Proxy l)
+    mkSList <$> replicateM l v
+
 instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
   varExists = do
     let l = fromInteger $ natVal (Proxy :: Proxy l)
@@ -142,6 +149,15 @@ testForAll2 =
     return (true :: SBool)
   -- return $ extractModels r
 
+prog :: (Num a, EqSymbolic a) => a -> a -> SBool
+prog p n =
+  (p .== 4 ==> n .== 1) &&&
+  (p .== 7 ==> n .== 3) &&&
+  (p .== 3 ==> n .== 6) &&&
+  (p .== 6 ==> n .== 2) &&&
+  (p .== 2 ==> n .== 5) &&&
+  (p .== 5 ==> n .== 1)
+
 {-|
 encode and decode variable length list
   with dummy values (representing empty elements)
@@ -171,12 +187,7 @@ testVList = do
       constrain $ head xs .== 1
       forM_ pair $ \(p, n) -> do
         constrain $ p .== 1 ==> n ./= 1
-        constrain $ p .== 4 ==> n .== 1
-        constrain $ p .== 7 ==> n .== 3
-        constrain $ p .== 3 ==> n .== 6
-        constrain $ p .== 6 ==> n .== 2
-        constrain $ p .== 2 ==> n .== 5
-        constrain $ p .== 5 ==> n .== 1
+        constrain $ prog p n
       return (true :: SBool)
 
 sortVList :: Ord a => [[a]] -> [[a]]
@@ -216,18 +227,66 @@ testVList2 = do
       constrain $ select xs minBound (l - 1) .== 1
       let pair = zip xs (tail xs)
       forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) ->
-        constrain $ literal i .< l-1 ==> (
-          (p ./= n) &&&
-          (p .== 4 ==> n .== 1) &&&
-          (p .== 7 ==> n .== 3) &&&
-          (p .== 3 ==> n .== 6) &&&
-          (p .== 6 ==> n .== 2) &&&
-          (p .== 2 ==> n .== 5) &&&
-          (p .== 5 ==> n .== 1) )
+        constrain $ literal i .< l-1 ==> ( (p ./= n) &&& prog p n )
       return (true :: SBool)
+
 
 instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
   type Val (a, b) = (Val a, Val b)
 
 instance (SatVar a, SatVar b) => SatVar (a, b) where
+  varForall = varForall >>= \a -> varForall >>= \b -> return (a, b)
   varExists = varExists >>= \a -> varExists >>= \b -> return (a, b)
+
+
+{-
+another example of user-defined container type
+-}
+newtype VList (l :: Nat) (u :: Nat) a =
+  VList { getVList :: [a] }
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+mkVList :: forall l u a. (KnownNat l, KnownNat u) => [a] -> VList l u a
+mkVList xs =
+  if natVal (Proxy :: Proxy l) <= l && l <= natVal (Proxy :: Proxy u)
+  then VList xs
+  else error $ "mkVList: invalid size: " ++ show l
+  where l = toInteger (length xs)
+
+lengthVList :: forall l u a. (KnownNat l, KnownNat u) =>
+               VList l u a -> (Integer, Integer)
+lengthVList _ = (natVal (Proxy :: Proxy l), natVal (Proxy :: Proxy u))
+
+instance (SatModel (Val (VList l u v)), SatVar (VList l u v),
+          SatSpace v, KnownNat l, KnownNat u) =>
+         SatSpace (VList l u v) where
+  type Val (VList l u v) = VList l u (Val v)
+
+instance (SatModel a, KnownNat l, KnownNat u) => SatModel (VList l u a) where
+  parseCWs xs0 = first mkVList <$> parseCWs0 l xs0
+    where
+      l = natVal (Proxy :: Proxy u)
+      parseCWs0 :: Integer -> [CW] -> Maybe ([a], [CW])
+      parseCWs0 _ [] = Just ([], [])
+      parseCWs0 0 _  = Just ([], [])
+      parseCWs0 i xs =
+        case parseCWs xs of
+         Just (a, ys) -> case parseCWs0 (i - 1) ys of
+                          Just (as, zs) -> Just (a:as, zs)
+                          Nothing       -> Just ([], ys)
+         Nothing     -> Just ([], xs)
+
+varVList :: forall l u v. (SatVar v, KnownNat l, KnownNat u) =>
+             Symbolic v -> Symbolic (VList l u v)
+varVList v = do
+  let l = fromInteger $ natVal (Proxy :: Proxy u)
+  mkVList <$> replicateM l v
+
+instance (SatVar v, KnownNat l, KnownNat u) => SatVar (VList l u v) where
+  varForall = varVList varForall
+  varExists = varVList varExists
+
+testVList3 :: IO [VList 1 2 Word8]
+testVList3 = allSat' $ \(VList vs :: VList 1 2 SWord8) -> do
+  forM_ vs $ \v -> constrain $ v `inRange` (0, 1)
+  return (true :: SBool)
