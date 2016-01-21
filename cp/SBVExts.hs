@@ -7,6 +7,7 @@ module SBVExts
        ( SatSpace, Val
        , SatVar (..)
        , allSat', allSatWith'
+       , constrain'
        ) where
 
 import Data.SBV
@@ -106,3 +107,6 @@ allSat' p = (allSat $ varExists >>= p) >>= return . extractModels
 allSatWith' :: SatSpace a => SMTConfig -> (a -> Predicate) -> IO [Val a]
 allSatWith' config p =
   (allSatWith config $ varExists >>= p) >>= return . extractModels
+
+constrain' :: SBool -> Predicate
+constrain' p = constrain p >> return (true :: SBool)

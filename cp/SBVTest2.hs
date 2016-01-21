@@ -115,7 +115,7 @@ instance (SatVar v, KnownNat l) => SatVar (SizedList l v) where
 extractSLists :: IO [SizedList 3 Integer]
 extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
   forM_ xs $ \x -> constrain $ 0 .<= x &&& x .<= 1
-  return (true :: SBool)
+  return true
 
 {-|
 >>> length <$> extractSLists2
@@ -124,7 +124,7 @@ extractSLists = allSat' $ \(SizedList xs :: SizedList 3 SInteger) -> do
 extractSLists2 :: IO [SizedList 2 V]
 extractSLists2 = allSat' $ \(SizedList xs :: SizedList 2 SV) -> do
   forM_ xs $ \(V i _) -> constrain $ abs i .<= 1
-  return (true :: SBool)
+  return true
 
 {-|
 returned only existential variables
@@ -205,30 +205,35 @@ encode and decode variable length list without dummy values
 -}
 testVList2 :: IO [[Word8]]
 testVList2 = do
-  r <- allSat constraints
+  r <- allSat $ setup >>= constraints
   return $ decode <$> extractModels r
   where
     decode :: (Word8, [Word8]) -> [Word8]
     decode (n, xs) = take (fromInteger . toInteger $ n) xs
-    constraints = do
-      -- encoding for variable length list
-      let minLen = 3
-          maxLen = 5 :: Word8
+
+    -- encoding for variable length list
+    setup :: Symbolic ([SWord8], SWord8)
+    setup = do
+      let (minLen, maxLen) = (3, 5)
       (l :: SWord8) <- exists_
       (xs :: [SWord8]) <- mkExistVars (fromInteger . toInteger $ maxLen)
       constrain $ l `inRange` (literal minLen, literal maxLen)
-      forM_ (zip xs [0 .. maxLen-1]) $
+      forM_ (zip xs [0..]) $
         \(x, i) -> constrain $
-                   literal i .>= l ==> x .== select xs minBound (l - 1)
+                   literal i .>= l ==> x .== minBound
+      return (xs, l)
 
-      -- domain specific constraints
-      forM_ xs $ \x -> constrain $ x `inRange` (1, 7)
+    -- domain specific constraints
+    constraints :: ([SWord8], SWord8) -> Predicate
+    constraints (xs, l) = do
+      forM_ (zip xs [0..]) $ \(x, i) ->
+        constrain $ literal i .< l ==> x `inRange` (1, 7)
       constrain $ head xs .== 1
       constrain $ select xs minBound (l - 1) .== 1
       let pair = zip xs (tail xs)
-      forM_ (zip pair [0 .. maxLen-2]) $ \((p, n), i) ->
-        constrain $ literal i .< l-1 ==> ( (p ./= n) &&& prog p n )
-      return (true :: SBool)
+      forM_ (zip pair [0..]) $ \((p, n), i) ->
+        constrain $ literal i .< l - 1 ==> ( (p ./= n) &&& prog p n )
+      return true
 
 
 instance (SatModel (Val (a, b)), SatVar (a, b)) => SatSpace (a, b) where
@@ -289,4 +294,4 @@ instance (SatVar v, KnownNat l, KnownNat u) => SatVar (VList l u v) where
 testVList3 :: IO [VList 1 2 Word8]
 testVList3 = allSat' $ \(VList vs :: VList 1 2 SWord8) -> do
   forM_ vs $ \v -> constrain $ v `inRange` (0, 1)
-  return (true :: SBool)
+  return true
