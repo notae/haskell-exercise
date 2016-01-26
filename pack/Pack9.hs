@@ -1,14 +1,14 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures   #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Pack9 where
 
@@ -16,13 +16,13 @@ import Control.Applicative
 import Data.Functor.Identity
 import Data.Maybe
 
-import Data.Map (Map)
-import Data.Set (Set)
 import Data.List (sort)
+import Data.Map  (Map)
+import Data.Set  (Set)
 
-import qualified GHC.Exts as GHCExts
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified GHC.Exts as GHCExts
 
 import Control.Lens
 import Control.Natural
@@ -189,8 +189,9 @@ cnt3 = CNat Set.fromList
 cntTest3 :: Set Int
 cntTest3 = cnt3 $$$ [1,2,3]
 
-pcnt0 :: (c x, c y) => (f ~~> g) c -> Pair (f x) (f y) -> Pair (g x) (g y)
-pcnt0 f (Pair x y) = Pair (f x) (f y)
+-- NG: for ambiguity check
+-- pcnt0 :: (c x, c y) => (f ~~> g) c -> Pair (f x) (f y) -> Pair (g x) (g y)
+-- pcnt0 f (Pair x y) = Pair (f x) (f y)
 
 -- pcntTest = pcnt cnt1 p2
 
@@ -206,9 +207,9 @@ pcntTest1 :: Pair_ Int Bool Set
 pcntTest1 = pcnt1 cnt3 p2
 
 -- NG: with variable type context outside newtype
-pcnt' :: (c x, c y) => (forall a. c a => f a -> g a)
-         -> Pair (f x) (f y) -> Pair (g x) (g y)
-pcnt' f (Pair x y) = Pair (f x) (f y)
+-- pcnt' :: (c x, c y) => (forall a. c a => f a -> g a)
+--          -> Pair (f x) (f y) -> Pair (g x) (g y)
+-- pcnt' f (Pair x y) = Pair (f x) (f y)
 
 -- OK: without type context
 pcnt'' :: (forall a. f a -> g a) -> Pair (f x) (f y) -> Pair (g x) (g y)
@@ -219,8 +220,9 @@ pcnt''' :: (Ord x, Ord y) => (forall a. Ord a => f a -> g a)
          -> Pair (f x) (f y) -> Pair (g x) (g y)
 pcnt''' f (Pair x y) = Pair (f x) (f y)
 
-fnforall :: forall c g. (c Int) => (forall a. c a => [a] -> g a) -> [Int] -> g Int
-fnforall f as = f as
+-- NG: for ambiguity check
+-- fnforall :: forall c g. (c Int) => (forall a. c a => [a] -> g a) -> [Int] -> g Int
+-- fnforall f as = f as
 
 -- NT-like transformation
 

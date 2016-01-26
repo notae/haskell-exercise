@@ -20,11 +20,22 @@ library
   exposed-modules:     NT
                      , Pack
                      , Pack2
+                     , Pack3
+                     , Pack4
+                     , Pack5
+                     , Pack6
+                     , Pack7
+                     , Pack8
+                     , Pack9
+                     , Container
+                     , Container2
+                     , Container3
+                     , Container4
                      , Generics
                      , Functor
                      , Unlift
   -- other-modules:       
-  other-extensions:    DeriveFunctor, FlexibleContexts, RankNTypes, StandaloneDeriving, UndecidableInstances
+  -- other-extensions:    DeriveFunctor, FlexibleContexts, RankNTypes, StandaloneDeriving, UndecidableInstances
   build-depends:       base
                      , containers
                      , transformers

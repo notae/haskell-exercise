@@ -84,11 +84,6 @@ class Tr a where
   tr f = f
 -- instance Tr Int where
 
-newtype Pair t a b = Pair (t a, b) deriving (Show, Eq)
-deriving instance Typeable Pair
-deriving instance (Typeable t, Typeable a, Typeable b, Data (t a), Data b)
-                  => Data (Pair t a b)
-
 -- t = everywhere (mkT (+ 1)) (1, (2, 3))
 {-
 class Typeable a => Data a where
