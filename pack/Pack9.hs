@@ -15,6 +15,7 @@ module Pack9 where
 import Control.Applicative
 import Data.Functor.Identity
 import Data.Maybe
+import Text.Show.Functions
 
 import Data.List (sort)
 import Data.Map  (Map)
