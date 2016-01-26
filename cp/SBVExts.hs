@@ -4,13 +4,16 @@
 {-# LANGUAGE TypeFamilies         #-}
 
 module SBVExts
-       ( SatSpace, Val
+       ( constrain'
+       , SatSpace, Val
        , SatVar (..)
        , allSat', allSatWith'
-       , constrain'
        ) where
 
 import Data.SBV
+
+constrain' :: SBool -> Predicate
+constrain' p = constrain p >> return (true :: SBool)
 
 {-
 class (SatModel a, SatVar (Var a)) => SatSpace a where
@@ -108,5 +111,4 @@ allSatWith' :: SatSpace a => SMTConfig -> (a -> Predicate) -> IO [Val a]
 allSatWith' config p =
   (allSatWith config $ varExists >>= p) >>= return . extractModels
 
-constrain' :: SBool -> Predicate
-constrain' p = constrain p >> return (true :: SBool)
+

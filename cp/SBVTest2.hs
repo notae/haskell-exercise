@@ -212,7 +212,7 @@ testVList2 = do
     decode (n, xs) = take (fromInteger . toInteger $ n) xs
 
     -- encoding for variable length list
-    setup :: Symbolic ([SWord8], SWord8)
+    setup :: Symbolic (SWord8, [SWord8])
     setup = do
       let (minLen, maxLen) = (3, 5)
       (l :: SWord8) <- exists_
@@ -221,11 +221,11 @@ testVList2 = do
       forM_ (zip xs [0..]) $
         \(x, i) -> constrain $
                    literal i .>= l ==> x .== minBound
-      return (xs, l)
+      return (l, xs)
 
     -- domain specific constraints
-    constraints :: ([SWord8], SWord8) -> Predicate
-    constraints (xs, l) = do
+    constraints :: (SWord8, [SWord8]) -> Predicate
+    constraints (l, xs) = do
       forM_ (zip xs [0..]) $ \(x, i) ->
         constrain $ literal i .< l ==> x `inRange` (1, 7)
       constrain $ head xs .== 1
@@ -247,31 +247,36 @@ instance (SatVar a, SatVar b) => SatVar (a, b) where
 {-
 another example of user-defined container type
 -}
-newtype VList (l :: Nat) (u :: Nat) a =
-  VList { getVList :: [a] }
+data VList (l :: Nat) (u :: Nat) i a =
+  VList { getVLen :: i, getVList :: [a] }
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
-mkVList :: forall l u a. (KnownNat l, KnownNat u) => [a] -> VList l u a
-mkVList xs =
-  if natVal (Proxy :: Proxy l) <= l && l <= natVal (Proxy :: Proxy u)
-  then VList xs
+mkVList :: forall l u i a. (KnownNat l, KnownNat u, Eq i, Num i) =>
+           i -> [a] -> VList l u i a
+mkVList i xs =
+  if natVal (Proxy :: Proxy l) <= l && l <= natVal (Proxy :: Proxy u) &&
+     i == fromInteger l
+  then VList i xs
   else error $ "mkVList: invalid size: " ++ show l
   where l = toInteger (length xs)
 
-lengthVList :: forall l u a. (KnownNat l, KnownNat u) =>
-               VList l u a -> (Integer, Integer)
+lengthVList :: forall l u i a. (KnownNat l, KnownNat u) =>
+               VList l u i a -> (Integer, Integer)
 lengthVList _ = (natVal (Proxy :: Proxy l), natVal (Proxy :: Proxy u))
 
-instance (SatModel (Val (VList l u v)), SatVar (VList l u v),
-          SatSpace v, KnownNat l, KnownNat u) =>
-         SatSpace (VList l u v) where
-  type Val (VList l u v) = VList l u (Val v)
+instance (SatModel (Val (VList l u i v)), SatVar (VList l u i v), SatVar i,
+          SatSpace i, SatSpace v, KnownNat l, KnownNat u) =>
+         SatSpace (VList l u i v) where
+  type Val (VList l u i v) = VList l u (Val i) (Val v)
 
-instance (SatModel a, KnownNat l, KnownNat u) => SatModel (VList l u a) where
-  parseCWs xs0 = first mkVList <$> parseCWs0 l xs0
+instance (SatModel i, Num i, Eq i, SatModel a, KnownNat l, KnownNat u) =>
+         SatModel (VList l u i a) where
+  parseCWs xs0 = do
+    (l :: i, xs1) <- parseCWs xs0
+    (xs, xs2) <- parseCWs0 l xs1
+    return $ (mkVList l xs, xs2)
     where
-      l = natVal (Proxy :: Proxy u)
-      parseCWs0 :: Integer -> [CW] -> Maybe ([a], [CW])
+      parseCWs0 :: Num i => i -> [CW] -> Maybe ([a], [CW])
       parseCWs0 _ [] = Just ([], [])
       parseCWs0 0 _  = Just ([], [])
       parseCWs0 i xs =
@@ -281,17 +286,19 @@ instance (SatModel a, KnownNat l, KnownNat u) => SatModel (VList l u a) where
                           Nothing       -> Just ([], ys)
          Nothing     -> Just ([], xs)
 
-varVList :: forall l u v. (SatVar v, KnownNat l, KnownNat u) =>
-             Symbolic v -> Symbolic (VList l u v)
+varVList :: forall l u i v.
+            (SatVar v, KnownNat l, KnownNat u, Num i, SymWord i) =>
+             Symbolic v -> Symbolic (VList l u (SBV i) v)
 varVList v = do
   let l = fromInteger $ natVal (Proxy :: Proxy u)
-  mkVList <$> replicateM l v
+  mkVList <$> varExists <*> replicateM l v
 
-instance (SatVar v, KnownNat l, KnownNat u) => SatVar (VList l u v) where
+instance (SatVar v, KnownNat l, KnownNat u, Num i, SymWord i) =>
+         SatVar (VList l u (SBV i) v) where
   varForall = varVList varForall
   varExists = varVList varExists
 
-testVList3 :: IO [VList 1 2 Word8]
-testVList3 = allSat' $ \(VList vs :: VList 1 2 SWord8) -> do
+testVList3 :: IO [VList 1 2 Word8 Word8]
+testVList3 = allSat' $ \(VList l vs :: VList 1 2 SWord8 SWord8) -> do
   forM_ vs $ \v -> constrain $ v `inRange` (0, 1)
   return true
