@@ -28,7 +28,6 @@ library
                      , Pack7
                      , Pack8
                      , Pack9
-                     , Pack10
                      , Container
                      , Container2
                      , Container3
@@ -36,6 +35,7 @@ library
                      , Generics
                      , Functor
                      , Unlift
+                     , Recursive
   -- other-modules:       
   -- other-extensions:    DeriveFunctor, FlexibleContexts, RankNTypes, StandaloneDeriving, UndecidableInstances
   build-depends:       base

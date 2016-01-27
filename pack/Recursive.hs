@@ -1,15 +1,10 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes     #-}
+{-# LANGUAGE TypeFamilies   #-}
 
-module Pack10 where
+module Recursive where
 
 import Data.Functor.Identity
-import Data.Maybe
 import Text.Show.Functions   ()
 
 import           Data.Set (Set)
