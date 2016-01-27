@@ -304,3 +304,22 @@ Pair {_px = fromList [1,2,3], _py = fromList [False,True]}
 -}
 testPGNT5 :: PGCNT t [] Set Ord Identity => t [] -> t Set
 testPGNT5 = runIdentity . pgcntA cnt4
+
+
+tupleNT :: (f ~> g) -> (f a, f b) -> (g a, g b)
+tupleNT f (a, b) = (f a, f b)
+
+tupleLift :: Applicative f => (a, b) -> (f a, f b)
+tupleLift (a, b) = (pure a, pure b)
+
+tupleUnlift :: Applicative f => (f a, f b) -> f (a, b)
+tupleUnlift (a, b) = (,) <$> a <*> b
+
+testTupleNT :: (Maybe Int, Maybe Bool)
+testTupleNT = tupleNT listToMaybe ([1, 2], [True])
+
+testTupleLift :: ([Int], [Bool])
+testTupleLift = tupleLift (1, True)
+
+testTupleUnlift :: [(Int, Bool)]
+testTupleUnlift = tupleUnlift ([1], [True])
