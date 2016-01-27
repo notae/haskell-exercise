@@ -1,6 +1,7 @@
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RankNTypes     #-}
-{-# LANGUAGE TypeFamilies   #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 module Recursive where
 
@@ -18,31 +19,22 @@ class P p where
   pdown :: (forall a. f a -> a) -> L p f -> p
   pdownM :: Monad m => (forall a. f a -> m a) -> L p f -> m p
   pdown' :: Applicative f => L p f -> f p
-
-{-
-instance P a where
-  type L a f = f a
-  plift f a = f a
-  pliftM f a = f a
-  pdown f a = f a
-  pdown' a = a
--}
-
-instance P Bool where
-  type L Bool f = f Bool
+  -- Default implementation
+  type L p f = f p
+  default plift :: (forall a. a -> f a) -> p -> f p
+  default pliftM :: Monad m => (forall a. a -> m (f a)) -> p -> m (f p)
+  default pdown :: (forall a. f a -> a) -> f p -> p
+  default pdownM :: Monad m => (forall a. f a -> m a) -> f p -> m p
+  default pdown' :: Applicative f => f p -> f p
   plift f a = f a
   pliftM f a = f a
   pdown f a = f a
   pdownM f a = f a
   pdown' a = a
 
-instance P Int where
-  type L Int f = f Int
-  plift f a = f a
-  pliftM f a = f a
-  pdown f a = f a
-  pdownM f a = f a
-  pdown' a = a
+-- Using default implementation
+instance P Bool
+instance P Int
 
 instance (P a, P b) => P (a, b) where
   type L (a, b) f = (L a f, L b f)
