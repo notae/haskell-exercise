@@ -219,7 +219,7 @@ Evaluate each action in the structure and collect the results:
 
 class P2 s t g where
   p2lift :: (forall a. a -> g a) -> s -> t
-  p2lift f = runIdentity .  p2liftA (Identity . f)
+  p2lift f = runIdentity . p2liftA (Identity . f)
   p2liftA :: Applicative f => (forall a. a -> f (g a)) -> s -> f t
   p2unlift :: (forall a. g a -> a) -> t -> s
   p2unlift f = runIdentity . p2unliftA (Identity . f)
@@ -227,9 +227,9 @@ class P2 s t g where
   p2sequence :: Applicative g => t -> g s
 
 instance P2 a (g a) g where
-  p2liftA f a = f a
-  p2unliftA f a = f a
-  p2sequence a = a
+  p2liftA f = f
+  p2unliftA f = f
+  p2sequence = id
 
 instance (P2 a a' g, Traversable t) => P2 (t a) (t a') g where
   p2liftA f = traverse (p2liftA f)
@@ -240,3 +240,49 @@ instance (P2 a a' g, P2 b b' g) => P2 (a, b) (a', b') g where
   p2liftA f (a, b) = (,) <$> (p2liftA f a) <*> (p2liftA f b)
   p2unliftA f (a, b) = (,) <$> (p2unliftA f a) <*> (p2unliftA f b)
   p2sequence (a, b) = (,) <$> p2sequence a <*> p2sequence b
+
+{-|
+Lift to non-'Applicative' with type context ('Ord'):
+
+>>> p2lift' ((Lift $ \x -> Set.fromList [x]) :: Lift Set Ord) (1::Int, True) :: (Set Int, Set Bool)
+(fromList [1],fromList [True])
+
+Lift to 'Applicative' with type context and monadic transformation:
+
+>>> p2liftA' ((LiftM $ Identity . Set.fromList . (:[])) :: LiftM Set Ord Identity) (1::Int, True) :: Identity (Set Int, Set Bool)
+Identity (fromList [1],fromList [True])
+
+Unlift 'Applicative' (partial) with type context:
+
+>>> p2unlift' (Unlift minimum :: Unlift [] Ord) ([1::Int], [True]) :: (Int, Bool)
+(1,True)
+
+Unlift 'Applicative' with type context and monadic transformation:
+
+>>> p2unliftA' ((UnliftM $ Identity . minimum) :: UnliftM [] Ord Identity) ([1::Int], [True]) :: Identity (Int, Bool)
+Identity (1,True)
+-}
+
+class P2' s t g c where
+  p2lift' :: Lift g c -> s -> t
+  p2liftA' :: Applicative f => LiftM g c f -> s -> f t
+  p2unlift' :: Unlift g c -> t -> s
+  p2unliftA' :: Applicative f => UnliftM g c f -> t -> f s
+
+instance c a => P2' a (g a) g c where
+  p2lift' (Lift f) = f
+  p2liftA' (LiftM f) = f
+  p2unlift' (Unlift f) = f
+  p2unliftA' (UnliftM f) = f
+
+instance (P2' a a' g c, Traversable t) => P2' (t a) (t a') g c where
+  p2lift' f = fmap (p2lift' f)
+  p2liftA' f = traverse (p2liftA' f)
+  p2unlift' f = fmap (p2unlift' f)
+  p2unliftA' f = traverse (p2unliftA' f)
+
+instance (P2' a a' g c, P2' b b' g c) => P2' (a, b) (a', b') g c where
+  p2lift' f (a, b) = (,) (p2lift' f a) (p2lift' f b)
+  p2liftA' f (a, b) = (,) <$> (p2liftA' f a) <*> (p2liftA' f b)
+  p2unlift' f (a, b) = (,) (p2unlift' f a) (p2unlift' f b)
+  p2unliftA' f (a, b) = (,) <$> (p2unliftA' f a) <*> (p2unliftA' f b)
