@@ -75,9 +75,9 @@ instance P Int
 
 instance (P a, P b) => P (a, b) where
   type L (a, b) g = (L a g, L b g)
-  plift f (a, b) = (plift f a, plift f b)
+  plift f (a, b) = (,) (plift f a) (plift f b)
   pliftA f (a, b) = (,) <$> pliftA f a <*> pliftA f b
-  punlift f (a, b) = (punlift f a, punlift f b)
+  punlift f (a, b) = (,) (punlift f a) (punlift f b)
   punliftA f (a, b) = (,) <$> punliftA f a <*> punliftA f b
   psequence (a, b) = (,) <$> psequence a <*> psequence b
 
@@ -129,9 +129,9 @@ instance c Bool => P' Bool c
 instance c Int => P' Int c
 
 instance (P' a c, P' b c) => P' (a, b) c where
-  plift' f (a, b) = (plift' f a, plift' f b)
+  plift' f (a, b) = (,) (plift' f a) (plift' f b)
   pliftA' f (a, b) = (,) <$> pliftA' f a <*> pliftA' f b
-  punlift' f (a, b) = (punlift' f a, punlift' f b)
+  punlift' f (a, b) = (,) (punlift' f a) (punlift' f b)
   punliftA' f (a, b) = (,) <$> punliftA' f a <*> punliftA' f b
 
 
