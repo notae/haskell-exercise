@@ -187,6 +187,12 @@ Lift to non-'Applicative':
 (fromList [1],fromList [True])
 -}
 {-|
+Lift nested structure:
+
+>>> p2lift (pure :: a -> [a]) [(1::Int, True), (2, False)] :: [([Int], [Bool])]
+[([1],[True]),([2],[False])]
+-}
+{-|
 Lift to 'Applicative' with monadic transformation:
 
 >>> p2liftA (Identity . pure :: a -> Identity [a]) (1::Int, True) :: Identity ([Int], [Bool])
@@ -217,35 +223,13 @@ class P2 s t g where
   p2unlift :: (forall a. g a -> a) -> t -> s
   p2unliftA :: Applicative f => (forall a. g a -> f a) -> t -> f s
   p2sequence :: Applicative g => t -> g s
-{-
-  -- Default implementation
-  default p2lift   :: t ~ g s => (forall a. a -> g a) -> s -> t
-  default p2liftA   :: t ~ g s => (forall a. a -> f (g a)) -> s -> f t
-  default p2unlift :: t ~ g s => (forall a. g a -> a) -> t -> s
-  default p2unliftA :: t ~ g s => (forall a. g a -> f a) -> t -> f s
-  default p2sequence :: (t ~ g s, Applicative g) => t -> g s
-  p2lift f a = f a
-  p2liftA f a = f a
-  p2unlift f a = f a
-  p2unliftA f a = f a
-  p2sequence a = a
--}
 
--- Using default implementation
 instance P2 a (g a) g where
   p2lift f a = f a
   p2liftA f a = f a
   p2unlift f a = f a
   p2unliftA f a = f a
   p2sequence a = a
-
--- instance P2 Bool (g Bool) g
--- instance P2 Int (g Int) g
-
--- instance P2 a (g a) g => P2 [a] [g a] g where
---   p2lift f = fmap (p2lift f)
---   p2unlift f = fmap (p2unlift f)
---   p2sequence = traverse p2sequence
 
 instance (P2 a a' g, Traversable t) => P2 (t a) (t a') g where
   p2lift f = fmap (p2lift f)
@@ -260,7 +244,3 @@ instance (P2 a a' g, P2 b b' g) => P2 (a, b) (a', b') g where
   p2unlift f (a, b) = (,) (p2unlift f a) (p2unlift f b)
   p2unliftA f (a, b) = (,) <$> (p2unliftA f a) <*> (p2unliftA f b)
   p2sequence (a, b) = (,) <$> p2sequence a <*> p2sequence b
-
-
-testNest :: [([Int], [Bool])]
-testNest = p2lift (pure :: a -> [a]) [(1::Int, True), (2, False)]
