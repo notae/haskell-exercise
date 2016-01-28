@@ -219,28 +219,24 @@ Evaluate each action in the structure and collect the results:
 
 class P2 s t g where
   p2lift :: (forall a. a -> g a) -> s -> t
+  p2lift f = runIdentity .  p2liftA (Identity . f)
   p2liftA :: Applicative f => (forall a. a -> f (g a)) -> s -> f t
   p2unlift :: (forall a. g a -> a) -> t -> s
+  p2unlift f = runIdentity . p2unliftA (Identity . f)
   p2unliftA :: Applicative f => (forall a. g a -> f a) -> t -> f s
   p2sequence :: Applicative g => t -> g s
 
 instance P2 a (g a) g where
-  p2lift f a = f a
   p2liftA f a = f a
-  p2unlift f a = f a
   p2unliftA f a = f a
   p2sequence a = a
 
 instance (P2 a a' g, Traversable t) => P2 (t a) (t a') g where
-  p2lift f = fmap (p2lift f)
   p2liftA f = traverse (p2liftA f)
-  p2unlift f = fmap (p2unlift f)
   p2unliftA f = traverse (p2unliftA f)
   p2sequence = traverse p2sequence
 
 instance (P2 a a' g, P2 b b' g) => P2 (a, b) (a', b') g where
-  p2lift f (a, b) = (,) (p2lift f a) (p2lift f b)
   p2liftA f (a, b) = (,) <$> (p2liftA f a) <*> (p2liftA f b)
-  p2unlift f (a, b) = (,) (p2unlift f a) (p2unlift f b)
   p2unliftA f (a, b) = (,) <$> (p2unliftA f a) <*> (p2unliftA f b)
   p2sequence (a, b) = (,) <$> p2sequence a <*> p2sequence b
