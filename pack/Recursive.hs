@@ -28,37 +28,45 @@ Lift to non-'Applicative':
 >>> plift Set.singleton (1::Int, True) :: (Set Int, Set Bool)
 (fromList [1],fromList [True])
 
->>> pliftM (Identity . pure) (1::Int, True) :: Identity ([Int], [Bool])
+Lift to 'Applicative' with monadic transformation:
+
+>>> pliftA (Identity . pure) (1::Int, True) :: Identity ([Int], [Bool])
 Identity ([1],[True])
+
+Unlift 'Applicative' (partial):
 
 >>> punlift head ([1], [True]) :: (Int, Bool)
 (1,True)
 
->>> punliftM (Identity . head) ([1::Int], [True]) :: Identity (Int, Bool)
+Unlift 'Applicative' with monadic transformation:
+
+>>> punliftA (Identity . head) ([1::Int], [True]) :: Identity (Int, Bool)
 Identity (1,True)
+
+Evaluate each action in the structure and collect the results:
 
 >>> psequence ([1, 2], [True, False]) :: [(Int, Bool)]
 [(1,True),(1,False),(2,True),(2,False)]
 -}
 
 class P p where
-  type L p (f :: * -> *)
-  plift :: (forall a. a -> f a) -> p -> L p f
-  pliftM :: Monad m => (forall a. a -> m (f a)) -> p -> m (L p f)
-  punlift :: (forall a. f a -> a) -> L p f -> p
-  punliftM :: Monad m => (forall a. f a -> m a) -> L p f -> m p
-  psequence :: Applicative f => L p f -> f p
+  type L p (g :: * -> *)
+  plift :: (forall a. a -> g a) -> p -> L p g
+  pliftA :: Applicative f => (forall a. a -> f (g a)) -> p -> f (L p g)
+  punlift :: (forall a. g a -> a) -> L p g -> p
+  punliftA :: Applicative f => (forall a. g a -> f a) -> L p g -> f p
+  psequence :: Applicative g => L p g -> g p
   -- Default implementation
-  type L p f = f p
-  default plift :: (forall a. a -> f a) -> p -> f p
-  default pliftM :: Monad m => (forall a. a -> m (f a)) -> p -> m (f p)
-  default punlift :: (forall a. f a -> a) -> f p -> p
-  default punliftM :: Monad m => (forall a. f a -> m a) -> f p -> m p
-  default psequence :: Applicative f => f p -> f p
+  type L p g = g p
+  default plift :: (forall a. a -> g a) -> p -> g p
+  default pliftA :: Applicative f => (forall a. a -> f (g a)) -> p -> f (g p)
+  default punlift :: (forall a. g a -> a) -> g p -> p
+  default punliftA :: Applicative f => (forall a. g a -> f a) -> g p -> f p
+  default psequence :: Applicative g => g p -> g p
   plift f a = f a
-  pliftM f a = f a
+  pliftA f a = f a
   punlift f a = f a
-  punliftM f a = f a
+  punliftA f a = f a
   psequence a = a
 
 -- Using default implementation
@@ -66,18 +74,18 @@ instance P Bool
 instance P Int
 
 instance (P a, P b) => P (a, b) where
-  type L (a, b) f = (L a f, L b f)
+  type L (a, b) g = (L a g, L b g)
   plift f (a, b) = (plift f a, plift f b)
-  pliftM f (a, b) = (,) <$> pliftM f a <*> pliftM f b
+  pliftA f (a, b) = (,) <$> pliftA f a <*> pliftA f b
   punlift f (a, b) = (punlift f a, punlift f b)
-  punliftM f (a, b) = (,) <$> punliftM f a <*> punliftM f b
+  punliftA f (a, b) = (,) <$> punliftA f a <*> punliftA f b
   psequence (a, b) = (,) <$> psequence a <*> psequence b
 
 
-newtype Lift f c = Lift (forall a. c a => a -> f a)
-newtype LiftM f c m = LiftM (forall a. c a => a -> m (f a))
-newtype Unlift f c = Unlift (forall a. c a => f a -> a)
-newtype UnliftM f c m = UnliftM (forall a. c a => f a -> m a)
+newtype Lift g c = Lift (forall a. c a => a -> g a)
+newtype LiftM g c m = LiftM (forall a. c a => a -> m (g a))
+newtype Unlift g c = Unlift (forall a. c a => g a -> a)
+newtype UnliftM g c m = UnliftM (forall a. c a => g a -> m a)
 
 {-|
 Lift to non-'Applicative' with type context ('Ord'):
@@ -85,30 +93,36 @@ Lift to non-'Applicative' with type context ('Ord'):
 >>> plift' ((Lift $ \x -> Set.fromList [x]) :: Lift Set Ord) (1::Int, True) :: (Set Int, Set Bool)
 (fromList [1],fromList [True])
 
->>> pliftM' ((LiftM $ Identity . Set.fromList . (:[])) :: LiftM Set Ord Identity) (1::Int, True) :: Identity (Set Int, Set Bool)
+Lift to 'Applicative' with type context and monadic transformation:
+
+>>> pliftA' ((LiftM $ Identity . Set.fromList . (:[])) :: LiftM Set Ord Identity) (1::Int, True) :: Identity (Set Int, Set Bool)
 Identity (fromList [1],fromList [True])
+
+Unlift 'Applicative' (partial) with type context:
 
 >>> punlift' (Unlift minimum :: Unlift [] Ord) ([1::Int], [True]) :: (Int, Bool)
 (1,True)
 
->>> punliftM' ((UnliftM $ Identity . minimum) :: UnliftM [] Ord Identity) ([1::Int], [True]) :: Identity (Int, Bool)
+Unlift 'Applicative' with type context and monadic transformation:
+
+>>> punliftA' ((UnliftM $ Identity . minimum) :: UnliftM [] Ord Identity) ([1::Int], [True]) :: Identity (Int, Bool)
 Identity (1,True)
 -}
 
 class P' p c where
-  plift' :: Lift f c -> p -> L p f
-  pliftM' :: Monad m => LiftM f c m -> p -> m (L p f)
-  punlift' :: Unlift f c -> L p f -> p
-  punliftM' :: Monad m => UnliftM f c m -> L p f -> m p
+  plift' :: Lift g c -> p -> L p g
+  pliftA' :: Applicative f => LiftM g c f -> p -> f (L p g)
+  punlift' :: Unlift g c -> L p g -> p
+  punliftA' :: Applicative f => UnliftM g c f -> L p g -> f p
   -- Default implementation
-  default plift' :: c p => Lift f c -> p -> f p
-  default pliftM' :: (c p, Monad m) => LiftM f c m -> p -> m (f p)
-  default punlift' :: c p => Unlift f c -> f p -> p
-  default punliftM' :: (c p, Monad m) => UnliftM f c m -> f p -> m p
+  default plift' :: c p => Lift g c -> p -> g p
+  default pliftA' :: (c p, Applicative f) => LiftM g c f -> p -> f (g p)
+  default punlift' :: c p => Unlift g c -> g p -> p
+  default punliftA' :: (c p, Applicative f) => UnliftM g c f -> g p -> f p
   plift' (Lift f) a = f a
-  pliftM' (LiftM f) a = f a
+  pliftA' (LiftM f) a = f a
   punlift' (Unlift f) a = f a
-  punliftM' (UnliftM f) a = f a
+  punliftA' (UnliftM f) a = f a
 
 -- Using default implementation
 instance c Bool => P' Bool c
@@ -116,9 +130,9 @@ instance c Int => P' Int c
 
 instance (P' a c, P' b c) => P' (a, b) c where
   plift' f (a, b) = (plift' f a, plift' f b)
-  pliftM' f (a, b) = (,) <$> pliftM' f a <*> pliftM' f b
+  pliftA' f (a, b) = (,) <$> pliftA' f a <*> pliftA' f b
   punlift' f (a, b) = (punlift' f a, punlift' f b)
-  punliftM' f (a, b) = (,) <$> punliftM' f a <*> punliftM' f b
+  punliftA' f (a, b) = (,) <$> punliftA' f a <*> punliftA' f b
 
 
 infixr 0 ~~>
