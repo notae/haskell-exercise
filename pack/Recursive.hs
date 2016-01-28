@@ -73,6 +73,31 @@ class P p where
 instance P Bool
 instance P Int
 
+-- confilct with 'type L (a, b) g'
+-- instance (P a, Traversable p) => P (p a) where
+--   type L (p a) g = p (L a g)
+--   plift f as = runIdentity $ traverse f as
+
+instance P a => P [a] where
+  type L [a] g = [L a g]
+  plift f = fmap (plift f)
+  pliftA f = traverse (pliftA f)
+  punlift f = fmap (punlift f)
+  punliftA f = traverse (punliftA f)
+  psequence = traverse psequence
+
+newtype Tuple2 a b = Tuple2 (a, b) deriving (Show, Eq)
+
+{-
+instance (P a, P b) => P (Tuple2 a b) where
+  type L (Tuple2 a b) g = Tuple2 (L a g) (L b g)
+  plift f (a, b) = (,) (plift f a) (plift f b)
+  pliftA f (a, b) = (,) <$> pliftA f a <*> pliftA f b
+  punlift f (a, b) = (,) (punlift f a) (punlift f b)
+  punliftA f (a, b) = (,) <$> punliftA f a <*> punliftA f b
+  psequence (a, b) = (,) <$> psequence a <*> psequence b
+-}
+
 instance (P a, P b) => P (a, b) where
   type L (a, b) g = (L a g, L b g)
   plift f (a, b) = (,) (plift f a) (plift f b)
@@ -147,3 +172,95 @@ type (f ~-> g) c m = forall a. c a => f a -> m (g a)
 
 infixr 0 :~->, $-
 newtype (f :~-> g) c m = CNT { ($-) :: (f ~-> g) c m }
+
+
+{-|
+Lift to 'Applicative':
+
+>>> p2lift (pure :: a -> [a]) (1::Int, True) :: ([Int], [Bool])
+([1],[True])
+-}
+{-|
+Lift to non-'Applicative':
+
+>>> p2lift Set.singleton (1::Int, True) :: (Set Int, Set Bool)
+(fromList [1],fromList [True])
+-}
+{-|
+Lift to 'Applicative' with monadic transformation:
+
+>>> p2liftA (Identity . pure :: a -> Identity [a]) (1::Int, True) :: Identity ([Int], [Bool])
+Identity ([1],[True])
+-}
+{-|
+Unlift 'Applicative' (partial):
+
+>>> p2unlift head ([1:: Int], [True]) :: (Int, Bool)
+(1,True)
+-}
+{-|
+Unlift 'Applicative' with monadic transformation:
+
+>>> p2unliftA (Identity . head) ([1::Int], [True]) :: Identity (Int, Bool)
+Identity (1,True)
+-}
+{-|
+Evaluate each action in the structure and collect the results:
+
+>>> p2sequence ([1::Int, 2], [True, False]) :: [(Int, Bool)]
+[(1,True),(1,False),(2,True),(2,False)]
+-}
+
+class P2 s t g where
+  p2lift :: (forall a. a -> g a) -> s -> t
+  p2liftA :: Applicative f => (forall a. a -> f (g a)) -> s -> f t
+  p2unlift :: (forall a. g a -> a) -> t -> s
+  p2unliftA :: Applicative f => (forall a. g a -> f a) -> t -> f s
+  p2sequence :: Applicative g => t -> g s
+{-
+  -- Default implementation
+  default p2lift   :: t ~ g s => (forall a. a -> g a) -> s -> t
+  default p2liftA   :: t ~ g s => (forall a. a -> f (g a)) -> s -> f t
+  default p2unlift :: t ~ g s => (forall a. g a -> a) -> t -> s
+  default p2unliftA :: t ~ g s => (forall a. g a -> f a) -> t -> f s
+  default p2sequence :: (t ~ g s, Applicative g) => t -> g s
+  p2lift f a = f a
+  p2liftA f a = f a
+  p2unlift f a = f a
+  p2unliftA f a = f a
+  p2sequence a = a
+-}
+
+-- Using default implementation
+instance P2 a (g a) g where
+  p2lift f a = f a
+  p2liftA f a = f a
+  p2unlift f a = f a
+  p2unliftA f a = f a
+  p2sequence a = a
+
+-- instance P2 Bool (g Bool) g
+-- instance P2 Int (g Int) g
+
+-- instance P2 a (g a) g => P2 [a] [g a] g where
+--   p2lift f = fmap (p2lift f)
+--   p2unlift f = fmap (p2unlift f)
+--   p2sequence = traverse p2sequence
+
+instance (P2 a a' g, Traversable t) => P2 (t a) (t a') g where
+  p2lift f = fmap (p2lift f)
+  p2liftA f = traverse (p2liftA f)
+  p2unlift f = fmap (p2unlift f)
+  p2unliftA f = traverse (p2unliftA f)
+  p2sequence = traverse p2sequence
+
+instance (P2 a a' g, P2 b b' g) => P2 (a, b) (a', b') g where
+  p2lift f (a, b) = (,) (p2lift f a) (p2lift f b)
+  p2liftA f (a, b) = (,) <$> (p2liftA f a) <*> (p2liftA f b)
+  p2unlift f (a, b) = (,) (p2unlift f a) (p2unlift f b)
+  p2unliftA f (a, b) = (,) <$> (p2unliftA f a) <*> (p2unliftA f b)
+  p2sequence (a, b) = (,) <$> p2sequence a <*> p2sequence b
+
+
+testNest :: [([Int], [Bool])]
+testNest = p2lift (pure :: a -> [a]) [(1::Int, True), (2, False)]
