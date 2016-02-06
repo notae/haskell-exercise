@@ -11,6 +11,7 @@
 module Recursive where
 
 import Data.Functor.Identity
+import GHC.Exts              (Constraint)
 import Text.Show.Functions   ()
 
 import           Data.Set (Set)
@@ -286,3 +287,20 @@ instance (P2' a a' g c, P2' b b' g c) => P2' (a, b) (a', b') g c where
   p2liftA' f (a, b) = (,) <$> (p2liftA' f a) <*> (p2liftA' f b)
   p2unlift' f (a, b) = (,) (p2unlift' f a) (p2unlift' f b)
   p2unliftA' f (a, b) = (,) <$> (p2unliftA' f a) <*> (p2unliftA' f b)
+
+{-
+-- NG: Experiments without newtype for transformation functions
+
+type family Ctx (g :: * -> *) :: * -> Constraint
+type instance Ctx [] = Eq
+type instance Ctx Set = Ord
+
+class P2'' s t g where
+  p2lift'' :: (forall a. Ctx g a => a -> g a) -> s -> t
+
+instance Ctx g a => P2'' a (g a) g where
+  p2lift'' f = f
+
+instance (P2'' a a' g, P2'' b b' g) => P2'' (a, b) (a', b') g where
+  p2lift'' f (a, b) = (,) (p2lift'' f a) (p2lift'' f b)
+-}
