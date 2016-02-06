@@ -128,3 +128,25 @@ extractLists = do
        constrain $ allDifferent (vs :: [SInteger])
        return $ (true :: SBool)
   return $ extractModels r
+
+{-|
+Variables with forall quantifier
+-}
+testForall :: IO SatResult
+testForall = sat $ do
+  (m :: SInteger) <- exists "m"
+  (x :: SInteger) <- forall "x"
+  constrain $ x `inRange` (-10, 10)
+  return $ - (x - 2) * (x - 3) .<= m
+
+{-|
+Optimization
+-}
+testOpt :: IO (Maybe [Integer])
+testOpt = minimize Quantified c 2 p where
+  c [x, y] = 2 * x * x + 3 * y * y * y
+  p [x, y] = bAnd
+             [ x `inRange` (0, 3)
+             , y `inRange` (0, 5)
+             , x + y .== 8
+             ]
