@@ -150,3 +150,32 @@ testOpt = minimize Quantified c 2 p where
              , y `inRange` (0, 5)
              , x + y .== 8
              ]
+
+-- | represent consistency grades in 0~10
+type SGrade = SWord8
+a0, a1, a2, a3, a4 :: SGrade
+[a0, a1, a2, a3, a4] = [0, 3, 5, 7, 10]
+
+c1 :: SWord8 -> SWord8 -> SWord8 -> SGrade
+c1 x y z = ite (x + y + z .== 7) a4 a0
+
+c2 :: SWord8 -> SGrade
+c2 z = ite (z .== 2) a4 (ite (z .== 1 ||| z .== 3) a3 a0)
+
+c3 :: SWord8 -> SGrade
+c3 y = ite (y .== 3 ||| y .== 4) a4 a2
+
+c4 :: SWord8 -> SGrade
+c4 x = ite (x .== 4) a4 (ite (x .== 3 ||| x .== 5) a3 a1)
+
+{-|
+>>> testOpt2
+Just [3,3,1]
+-}
+testOpt2 :: IO (Maybe [Word8])
+testOpt2 = maximize Quantified c 3 p where
+  c [x, y, z] = sminimum [c1 x y z, c2 z, c3 y, c4 x]
+  p vs = bAll (`inRange` (0, 7)) vs
+  sminimum :: OrdSymbolic a => [a] -> a
+  sminimum [x] = x
+  sminimum (x:xs) = smin x (sminimum xs)
