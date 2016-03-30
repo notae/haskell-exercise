@@ -176,6 +176,4 @@ testOpt2 :: IO (Maybe [Word8])
 testOpt2 = maximize Quantified c 3 p where
   c [x, y, z] = sminimum [c1 x y z, c2 z, c3 y, c4 x]
   p vs = bAll (`inRange` (0, 7)) vs
-  sminimum :: OrdSymbolic a => [a] -> a
-  sminimum [x] = x
-  sminimum (x:xs) = smin x (sminimum xs)
+  sminimum = foldl1 smin
