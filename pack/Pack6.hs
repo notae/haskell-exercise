@@ -27,9 +27,15 @@ test11 = over _1 Set.fromList s1
 test12 :: ([Int], Set Bool)
 test12 = over _2 Set.fromList s1
 
+-- NG
 mapTuple1 :: (forall x. f x -> g x) -> (f a, f b) -> (g a, f b)
 mapTuple1 f = over _1 f
 
+-- OK
+mapTuple2 :: (f a -> g a) -> (f b -> g b) -> (f a, f b) -> (g a, g b)
+mapTuple2 f g = over _2 g . over _1 f
+
+-- OK
 mapTuple :: (Ord a, Ord b) =>
             (forall x. Ord x => f x -> g x) -> (f a, f b) -> (g a, g b)
 mapTuple f = over _2 f . over _1 f

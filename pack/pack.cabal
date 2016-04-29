@@ -28,6 +28,8 @@ library
                      , Pack7
                      , Pack8
                      , Pack9
+                     , Pack10
+                     , Pack11
                      , Container
                      , Container2
                      , Container3
@@ -46,6 +48,8 @@ library
                      , constraints
                      , monad-control
                      , lens
+                     , distributive
+                     , adjunctions
                      , newtype
                      , natural-transformation
                      , syb
