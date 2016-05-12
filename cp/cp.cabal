@@ -29,6 +29,8 @@ library
                      , SBVTest2
                      , SBVTest3
                      , SBVTest4
+                     , SBVTest5
+                     , SBVTest6
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base

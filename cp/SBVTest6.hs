@@ -39,11 +39,12 @@ instance ComplexExpr Complex where
   comp x y = Complex (x, y)
   cadd (Complex (x, y)) (Complex (x', y')) = Complex (x + x', y + y')
 
-newtype SComplex a = SComplex (SBV a, SBV a) deriving Show
+-- X: similar code
+newtype SComplex a = SComplex (SBV a, SBV a) deriving Show -- X
 
 instance ComplexExpr SComplex where
   comp x y = SComplex (literal x, literal y)
-  cadd (SComplex (x, y)) (SComplex (x', y')) = SComplex (x + x', y + y')
+  cadd (SComplex (x, y)) (SComplex (x', y')) = SComplex (x + x', y + y') -- X
 
 instance ComplexExpr S where
   comp x y = S $ show (x, y)
@@ -75,12 +76,12 @@ c3 :: ComplexExpr repl => repl Int8
 c3 = comp 3 5
 
 {-|
->>> putStrLn $ unS $ tceq ~&& bool False
-(((1,2) `cadd` (2,3)) `ceq` (3,5)) ~&& bool False
 >>> runIdentity $ tceq ~&& bool False
 False
 >>> tceq ~&& bool False :: SBool
 False
+>>> putStrLn $ unS $ tceq ~&& bool False
+(((1,2) `cadd` (2,3)) `ceq` (3,5)) ~&& bool False
 -}
 tceq :: (ComplexExpr (C repl), ComplexBoolExpr repl) => repl Bool
 tceq = (c1 `cadd` c2) `ceq` c3
